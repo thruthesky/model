@@ -122,6 +122,38 @@ anchorNode.add(root);                             // root 를 자식으로만 �
 | 3 | 캐릭터가 **두 배로 이동** | 클립에 root motion 잔존 | `postprocess_glb.py` 의 `strip_root_motion` |
 | 4 | 메시가 **미묘하게 찌그러짐** | 정점당 본 영향 5개 이상 → `JOINTS_1` 무시 | Blender `export_influence_nb=4`, `export_all_influences=False` · `inspect_glb.py` |
 | 5 | 정지 포즈가 **계속 섞임** | `stop()` 만 하고 `weight` 를 안 내림 | 비활성 클립은 `weight = 0` |
+| 6 | 같은 GLB 를 **두 번 파싱** | 로딩이 끝나기 전에는 "무엇을 불러왔는지" 가 아직 비어 있어, 그것을 감시하는 쪽이 또 요청한다 | 진행 중인 `Future` 를 공유한다(아래) |
+
+### #6 — 여러 캐릭터 변형(성별·종족)을 쓸 때
+
+모델을 조건에 따라 바꾸는 구조(예: 프로필 성별)에서는 **"지금 무엇이 붙어 있나" 만으로
+중복을 막을 수 없다.** 로딩이 진행 중인 동안 그 값은 아직 이전 상태이기 때문이다.
+
+```dart
+Future<bool>? _pendingLoad;
+Variant? _pendingVariant;
+
+Future<bool> loadModel({Variant? variant}) {
+  final target = variant ?? defaultVariant;
+  if (_model != null && _loadedVariant == target) return Future.value(true);
+  if (_pendingLoad != null && _pendingVariant == target) return _pendingLoad!;  // ← 핵심
+
+  _pendingVariant = target;
+  final future = _loadFor(target);
+  _pendingLoad = future;
+  return future.whenComplete(() {
+    // 뒤늦게 끝난 옛 로딩이 새 로딩의 자리를 지우지 않게 한다.
+    if (identical(_pendingLoad, future)) { _pendingLoad = null; _pendingVariant = null; }
+  });
+}
+```
+
+교체할 때는 **이전 모델의 root 를 `Node.remove()` 로 떼어낸다.** 클립은 그 root 에 딸려
+있으므로 함께 사라진다 — `removeAnimationClip` 을 따로 부를 필요가 없다.
+
+**변형들이 같은 리그·같은 클립 이름을 쓰게 만들면** 클립 이름 대응표 하나로 전부 돌아간다
+(Tripo `v1.0 Humanoid` 는 어떤 모델이든 41본 `Root` 리그를 만들므로 이 규약이 자연스럽게
+지켜진다 — 실측).
 
 > **#5 를 오해하지 말 것.** `weight = 0` 이면 블렌드에서 완전히 빠진다
 > (`animation_player.dart:99-109` 의 `totalWeight` 합산에 0 은 기여하지 않는다). 그리고

@@ -243,3 +243,16 @@ Export 를 여러 번 누르면 이전 요청의 ZIP 이 나중에 도착한다.
 
 **8. 리깅 완료를 오판한다**
 `/Retry/` 정규식은 `Free Retry` 버튼 때문에 **항상 참**이다. 위 "Auto Rig 실행" 의 판정 코드를 쓸 것.
+
+**9. 리깅이 끝났는데 화면이 안 바뀐다** (2026-07-29 실측)
+`Auto Rig` 를 눌러도 버튼이 계속 `Auto Rig 20` 이고 크레딧도 그대로여서 "안 눌렸다" 고 판단했는데, **새로고침하니 이미 완료돼 있었다**(크레딧도 그때 차감된 것으로 보였다). SPA 상태가 갱신을 놓친 것이다.
+→ **판정이 애매하면 `navigate_page` 로 reload 한 뒤 다시 본다.** 무작정 다시 누르면 크레딧을 두 번 쓴다.
+
+**10. `pre_rig_check` 가 400 을 돌려준다**
+```
+POST /v2/studio/operation/pre_rig_check → 400
+{"code":2026,"message":"Submit task failed",
+ "suggestion":"Please check request params and algorithm server client"}
+```
+요청 파라미터(`model_version`·`project_id`)가 정상인데도 난다. **Tripo 알고리즘 서버 쪽 일시 장애**다(같은 시각 모델 생성도 평소 5분에서 13분으로 늘어났다). 크레딧은 차감되지 않는다.
+→ 몇 분 두었다가 재시도한다. **원인을 화면에서 알 수 없으므로** 버튼이 안 먹을 때는 `list_console_messages` 와 `list_network_requests` 로 실제 응답을 확인할 것 — 이게 유일한 진단 수단이다.
