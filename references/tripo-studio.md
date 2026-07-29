@@ -17,14 +17,54 @@ Tripo Studio 는 React SPA 다. 세 가지 원칙을 지켜야 자동화가 깨�
 
 1. **uid 는 매 스냅샷마다 바뀐다.** 조작 직전에 `take_snapshot` 을 다시 찍어 uid 를 확보할 것.
 2. **스냅샷 출력이 매우 길다**(에셋 목록에 서명된 URL 이 수백 줄). `filePath` 로 파일에 저장한 뒤 `grep` 으로 필요한 uid 만 뽑아 쓸 것. 컨텍스트를 아낀다.
-3. **드롭다운(`combobox`)은 `evaluate_script` 의 `.click()` 으로 열리지 않는다.** Radix UI 계열이라 합성 이벤트가 필요하다. 반드시 `click` 도구에 uid 를 넘길 것. 단순 버튼은 `evaluate_script` 로 눌러도 된다.
+   ⚠️ `filePath` 는 **워크스페이스 루트 안**이어야 한다. 밖을 주면 `Access denied` 로 거부된다. 프로젝트 루트에 `.tripo-snap.txt` 같은 임시 파일을 쓰고 **작업이 끝나면 지운다.**
+3. **작업을 실제로 일으키는 버튼은 `evaluate_script` 의 `.click()` 으로 눌리지 않는다.** Radix UI 계열이라 합성 이벤트가 필요하다.
+
+### 무엇을 어떤 도구로 누르나 (2026-07-29 실측)
+
+| 대상 | 방법 | 비고 |
+|---|---|---|
+| `Auto Rig`·`Export`(다이얼로그 열기)·드롭다운·옵션 선택 | **`click` 도구에 uid** | `evaluate_script` 로 누르면 **아무 일도 일어나지 않는다**(오류도 없다) |
+| 토글 버튼(`T-Pose`) | `evaluate_script` 가능 | 상태는 다음 호출에서 확인할 것 — 같은 호출 안에서는 갱신 전 값이 보인다 |
+| 다이얼로그 **안**의 `Export`(최종 실행) | `evaluate_script` 가능 | 아래 "마지막 버튼" 패턴 |
+| textarea 채우기 | native setter + `input` 이벤트 | 아래 코드 |
+
+**가장 흔한 실수**: `evaluate_script` 로 `Auto Rig` 를 누르고 "눌렀다" 고 판단한 뒤 다음
+단계로 넘어가는 것. 실제로는 안 눌렸고 크레딧도 차감되지 않는다. **크레딧 숫자가
+줄었는지로 실행 여부를 확인할 것.**
 
 ```js
-// 스냅샷 없이 버튼을 찾아 누르는 패턴 (단순 버튼에만 사용)
+// 다이얼로그 안의 마지막 Export (이건 evaluate_script 로 된다)
 () => {
-  const b = [...document.querySelectorAll('button')].find(x => x.textContent.trim() === 'Export');
-  if (b) b.click();
-  return { clicked: !!b };
+  const btns = [...document.querySelectorAll('button')].filter(b => b.textContent.trim() === 'Export');
+  const last = btns[btns.length - 1];
+  if (last) last.click();
+  return { count: btns.length, clicked: !!last };
+}
+```
+
+```js
+// React textarea 채우기 — 값을 직접 대입하면 상태가 안 바뀐다
+() => {
+  const ta = document.querySelector('textarea');
+  const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value').set;
+  setter.call(ta, "여기에 프롬프트");
+  ta.dispatchEvent(new Event('input', { bubbles: true }));
+  return { value: ta.value };
+}
+```
+
+```js
+// Radix 드롭다운 "열기" 만은 이 이벤트 시퀀스로 된다 (선택은 click 도구로)
+() => {
+  const el = document.querySelector('[role="combobox"]');
+  const o = { bubbles: true, cancelable: true, pointerId: 1, button: 0, isPrimary: true, pointerType: 'mouse' };
+  el.dispatchEvent(new PointerEvent('pointerdown', o));
+  el.dispatchEvent(new MouseEvent('mousedown', o));
+  el.dispatchEvent(new PointerEvent('pointerup', o));
+  el.dispatchEvent(new MouseEvent('mouseup', o));
+  el.click();
+  return { opened: el.getAttribute('data-state') };   // ⚠️ 다음 호출에서 다시 확인할 것
 }
 ```
 
@@ -109,14 +149,30 @@ heavy mechanical armor plating, glowing red eyes, symmetrical, clean topology, g
 
 `Auto Rig` 버튼 (20 크레딧). 1~2분 소요.
 
-완료 판정: 버튼이 `Retry` 로 바뀌고, `Skeleton` 토글과 `Model Type: Humanoid` 가 나타난다.
+⚠️ **`click` 도구로 눌러야 한다.** `evaluate_script` 로는 반응이 없다(실측). 눌린 것을
+**크레딧 차감으로 확인**할 것 — 화면 텍스트만 보면 눌렸는지 알 수 없다.
+
+⚠️ **완료 판정에 `/Retry/` 를 쓰지 말 것.** 화면 하단에 `Free Retry` 버튼이 **처음부터
+있어서** 이 정규식은 항상 참이다(실측 — 리깅이 시작도 안 됐는데 "완료" 로 오판했다).
+
+올바른 판정은 세 가지를 함께 본다:
 
 ```js
 () => {
   const t = document.body.innerText;
-  return { done: /Retry/.test(t), modelType: (t.match(/Model Type\s*\n\s*([^\n]+)/) || [])[1] };
+  const btn = [...document.querySelectorAll('button')]
+      .find(b => /^Auto Rig|^Retry/.test(b.textContent.trim()));
+  return {
+    // 리깅 전: "Auto Rig 20" / 완료 후: "Retry 20"
+    rigButton: btn && btn.textContent.trim(),
+    modelType: (t.match(/Model Type\s*\n\s*([^\n]+)/) || [])[1],  // "Humanoid"
+    skeleton: /Skeleton/.test(t),
+    rigFirst: /Rig the Model First/.test(t),   // 애니메이션 목록의 안내 — 완료되면 사라진다
+  };
 }
 ```
+
+완료 상태: `rigButton: "Retry 20"` · `modelType: "Humanoid"` · `skeleton: true` · `rigFirst: false`
 
 ## Export (다운로드)
 
@@ -178,3 +234,12 @@ Export 를 여러 번 누르면 이전 요청의 ZIP 이 나중에 도착한다.
 
 **5. Guide / 프로모션 팝업**
 `Guide`, `View Your Model`, `8K Texture`, `Special Bonus` 등이 수시로 뜬다. 클릭을 가로막으므로 `OK` / `No Thanks` / `Maybe Later` 로 닫는다.
+
+**6. 버튼을 눌렀는데 아무 일도 안 일어난다**
+`evaluate_script` 의 `.click()` 은 `Auto Rig`·`Export`·드롭다운에서 **조용히 무시된다**. 오류도 안 나고 화면도 그대로다. → `take_snapshot` 으로 uid 를 얻어 **`click` 도구**를 쓴다.
+
+**7. Export 다이얼로그가 안 열린다**
+`Export` 버튼은 **두 개**다 — 화면 하단의 것(다이얼로그 열기)과 다이얼로그 안의 것(실행). 하단 것은 `click` 도구로, 안쪽 것은 `evaluate_script` 의 "마지막 버튼" 패턴으로 누른다.
+
+**8. 리깅 완료를 오판한다**
+`/Retry/` 정규식은 `Free Retry` 버튼 때문에 **항상 참**이다. 위 "Auto Rig 실행" 의 판정 코드를 쓸 것.
