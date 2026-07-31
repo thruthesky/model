@@ -30,7 +30,9 @@ def main():
 
     if not armatures:
         print("아마추어 없음 — 스켈레톤이 포함되지 않은 파일이다")
-        print("  (Tripo 에서 Export Skeleton 을 켜고 다시 내보낼 것)")
+        print("  · ③ 의 Tripo raw(<NAME>_raw.fbx)라면 **정상이다** — 리깅은 ARP 가 한다")
+        print("  · ⑤ 의 ARP export 결과인데 이렇다면 Export 가 실패한 것이다")
+        print("  · 레거시 GLB 경로라면 Tripo 에서 Export Skeleton 을 켜고 다시 내보낼 것")
         return
 
     for arm in armatures:

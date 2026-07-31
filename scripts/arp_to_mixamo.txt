@@ -1,0 +1,117 @@
+# Auto-Rig Pro deform 본 -> Mixamo 본 이름
+#
+# ARP 의 Game Engine Export 패널에서 "Rename Bones" 에 이 파일을 지정하면
+# export 되는 스켈레톤의 본 이름이 Mixamo 규격으로 바뀐다.
+#   Scene.arp_export_renaming = True
+#   Scene.arp_rename_fp       = "<이 파일의 절대경로>"
+#
+# 왜 필요한가:
+#   texture-packer 의 _sheet_render.py 는 리그를 본 이름으로 감지한다(RIG_BONES).
+#   ARP 이름(root.x/arm_stretch.l/...)은 그 표에 없어 애니메이션이 붙지 않는다.
+#   Mixamo 이름으로 맞추면 game-assets/animations/default/*.fbx 가
+#   리타게팅 없이 그대로 적용된다 — 변환 단계가 하나 사라진다.
+#
+# 🛑 손가락 30줄을 "128px 에서 안 보이니" 지우지 말 것 — 임계 통과에 필요하다.
+#   _sheet_render.py:451 의 직접 적용 조건은 **본 이름 교집합** ≥ max(8, 애니본×0.5) 이다.
+#   Mixamo 애니는 65본이므로(실측: default/ 5개 전부) 임계는 32.
+#     · 이 표 전체(몸통6+팔8+다리8+손가락30) → 교집합 52 → 통과
+#     · 손가락을 빼고 몸통·사지만  → 교집합 22 → **미달 → 정적 아틀라스**
+#   그리고 임계 미달에는 구제 경로가 없다. _sheet_render.py:457 은 두 리그가 *다를* 때만
+#   retarget 하는데, 여기서는 캐릭터·애니가 둘 다 mixamorig 로 감지되므로 곧바로
+#   "####WARN … → 정적" 으로 떨어진다(462-463).
+#   (65본은 Blender 로 실측했고, 52/22 는 이 표와 대조해 센 값이다)
+#
+# 형식: <ARP 본 이름> = <새 이름>   (ARP 의 rename_custom() 이 '=' 로 분리)
+# 없는 본은 조용히 건너뛴다. 그래서 spine_03.x 처럼 설정에 따라
+# 존재하지 않을 수 있는 본을 적어 두어도 안전하다.
+#
+# ⚠️ export 로그에 `Invalid renaming syntax, skip:` 이 주석·빈 줄 수만큼 찍힌다
+#    (auto_rig_ge.py:10411-10415 가 '=' 없는 줄마다 출력). **정상이다.**
+#    다만 그 노이즈에 진짜 실패가 묻히므로, 주석에 본 이름과 '=' 를 함께 쓰지 말 것
+#    — 주석이 매핑 줄로 해석된다.
+
+# ── 몸통 ──────────────────────────────────────────────
+# ARP 의 root.x 가 골반이다. c_traj/c_root_master 는 컨트롤러라 export 되지 않는다.
+root.x = mixamorig:Hips
+spine_01.x = mixamorig:Spine
+spine_02.x = mixamorig:Spine1
+# ⚠️ spine_03.x 는 **Spine Count 가 4 이상일 때만** export 리그에 존재한다.
+#    auto_rig_ge.py:6287 → `if spine_count > 3:` 이면 spine_03 부터 추가하고,
+#    auto_rig_ge.py:6322 → `elif spine_count == 3:` 이면 spine_03.x 를 **삭제**한다.
+#    즉 "3 으로 맞추면 3분할" 이 아니라 **3 으로 두면 2분할이 된다.**
+#    Mixamo 의 Spine/Spine1/Spine2 에 대응시키려면 Spine Count = 4.
+#    (프로퍼티 기본값은 4 다 — auto_rig_smart.py:8421)
+spine_03.x = mixamorig:Spine2
+neck.x = mixamorig:Neck
+head.x = mixamorig:Head
+
+# ── 팔 ────────────────────────────────────────────────
+# 팔·다리의 deform 본에는 _stretch 접미사가 붙는다(arm.l 은 IK/FK 중간 본이라 export 안 됨).
+shoulder.l = mixamorig:LeftShoulder
+arm_stretch.l = mixamorig:LeftArm
+forearm_stretch.l = mixamorig:LeftForeArm
+hand.l = mixamorig:LeftHand
+shoulder.r = mixamorig:RightShoulder
+arm_stretch.r = mixamorig:RightArm
+forearm_stretch.r = mixamorig:RightForeArm
+hand.r = mixamorig:RightHand
+
+# ── 다리 ──────────────────────────────────────────────
+thigh_stretch.l = mixamorig:LeftUpLeg
+leg_stretch.l = mixamorig:LeftLeg
+foot.l = mixamorig:LeftFoot
+toes_01.l = mixamorig:LeftToeBase
+thigh_stretch.r = mixamorig:RightUpLeg
+leg_stretch.r = mixamorig:RightLeg
+foot.r = mixamorig:RightFoot
+toes_01.r = mixamorig:RightToeBase
+
+# ── 손가락 ────────────────────────────────────────────
+# ⚠️ HUMANOID export 리그에서는 **세 마디 모두 c_ 접두사**를 갖는다.
+#    ARP 가 원본 이름에서 c_ 를 뗐다가 Rig Type=Humanoid 면 전부 다시 붙이기 때문이다:
+#      auto_rig_ge.py:8587-8589  # humanoid fingers have 'c_' prefix
+#                                if scn.arp_export_rig_type == 'HUMANOID':
+#                                    finger_name = 'c_'+finger_name
+#    원본 ARP 리그(human.blend)의 deform 본은 1번 마디에 c_ 가 없어서(`thumb1.l`) 헷갈리기
+#    쉽지만, rename 대상은 원본이 아니라 export 임시 리그(`_arpexp`)다. 실제로 1차 작성에서
+#    이 함정에 빠져 1번 마디 10줄이 통째로 rename 되지 않았다.
+#
+# 🛑 c_ 없는 이름을 "보험" 으로 병기하지 말 것. rename_custom 은 없는 본을 skip 할 뿐
+#    이름 충돌을 처리하지 않아(auto_rig_ge.py:10418-10420), 두 이름이 다 존재하면
+#    Blender 가 `.001` 을 붙여 조용히 어긋난다.
+c_thumb1.l = mixamorig:LeftHandThumb1
+c_thumb2.l = mixamorig:LeftHandThumb2
+c_thumb3.l = mixamorig:LeftHandThumb3
+c_index1.l = mixamorig:LeftHandIndex1
+c_index2.l = mixamorig:LeftHandIndex2
+c_index3.l = mixamorig:LeftHandIndex3
+c_middle1.l = mixamorig:LeftHandMiddle1
+c_middle2.l = mixamorig:LeftHandMiddle2
+c_middle3.l = mixamorig:LeftHandMiddle3
+c_ring1.l = mixamorig:LeftHandRing1
+c_ring2.l = mixamorig:LeftHandRing2
+c_ring3.l = mixamorig:LeftHandRing3
+c_pinky1.l = mixamorig:LeftHandPinky1
+c_pinky2.l = mixamorig:LeftHandPinky2
+c_pinky3.l = mixamorig:LeftHandPinky3
+c_thumb1.r = mixamorig:RightHandThumb1
+c_thumb2.r = mixamorig:RightHandThumb2
+c_thumb3.r = mixamorig:RightHandThumb3
+c_index1.r = mixamorig:RightHandIndex1
+c_index2.r = mixamorig:RightHandIndex2
+c_index3.r = mixamorig:RightHandIndex3
+c_middle1.r = mixamorig:RightHandMiddle1
+c_middle2.r = mixamorig:RightHandMiddle2
+c_middle3.r = mixamorig:RightHandMiddle3
+c_ring1.r = mixamorig:RightHandRing1
+c_ring2.r = mixamorig:RightHandRing2
+c_ring3.r = mixamorig:RightHandRing3
+c_pinky1.r = mixamorig:RightHandPinky1
+c_pinky2.r = mixamorig:RightHandPinky2
+c_pinky3.r = mixamorig:RightHandPinky3
+
+# ── 일부러 매핑하지 않는 본 ────────────────────────────
+#   *_twist / c_arm_twist_offset  : Mixamo 에 대응이 없다. 억지로 매핑하면 팔이 뒤틀린다.
+#                                   ARP export 에서 arp_export_twist = False 로 끄는 편이 낫다.
+#   c_*1_base (metacarpal)        : Mixamo 손 계층에 대응하는 마디가 없다.
+#   얼굴/눈/턱                     : 16방향 128px 스프라이트에서는 보이지 않는다.

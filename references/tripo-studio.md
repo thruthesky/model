@@ -130,7 +130,15 @@ heavy mechanical armor plating, glowing red eyes, symmetrical, clean topology, g
 ```
 생성이 시작되면 URL 이 `/workspace/generate/<task-id>` 로 바뀐다.
 
-## 오토 리깅
+## 오토 리깅 〔🛑 레거시 — 현재 파이프라인에서는 쓰지 않는다〕
+
+> **이 절을 따라가면 SKILL.md 의 결정을 되돌리게 된다**〔원저자 지시 2026-07-30〕.
+> 지금은 **리깅하지 않은 메시만 내려받아 Blender 의 Auto-Rig Pro 로 리깅**한다
+> ([SKILL.md ③·④](../SKILL.md)). Tripo 의 `Animate` 탭에 들어가지 않으며 리깅 20 크레딧도
+> 쓰지 않는다.
+>
+> 아래 내용은 **3D 런타임을 쓰는 다른 프로젝트**(GLB + `retarget.py` 경로)를 위해 남겨 둔
+> 기록이다. 삭제하지 않는 이유는 그 경로가 아직 유효하기 때문이다.
 
 좌측 사이드바 `Animate` → `https://studio.tripo3d.ai/workspace/rigging/<task-id>`
 
@@ -194,8 +202,8 @@ heavy mechanical armor plating, glowing red eyes, symmetrical, clean topology, g
 | File Name | 단계마다 다르게 | 아래 "함정" 참고 |
 | Format | `FBX` | Mixamo 애니메이션도 FBX 라 파이프라인이 단순해진다 |
 | FBX 프리셋 | `Blender` | `Mixamo`/`3dsmax` 를 고르면 본 방향이 바뀌어 `BONE_MAP` 이 안 맞는다 |
-| Texture Resolution | `8k` (기본) | 낮춰도 무방. 파일 크기와 처리 시간에 직결된다 |
-| Export Skeleton | **ON** | 꺼져 있으면 메시만 나와서 리타게팅이 불가능하다 |
+| Texture Resolution | **`2k`** | ⚠️ **`8k` 는 ZIP 이 지연되거나 아예 오지 않는다**(크레딧만 차감 — 실측). 기본값이 8k 이므로 매번 내려야 한다 |
+| Export Skeleton | **경로에 따라 다르다** | **현재 파이프라인은 OFF**(리깅을 ARP 가 한다 → [SKILL.md ③](../SKILL.md)). 위 "오토 리깅" 레거시 경로에서만 ON |
 
 FBX 는 **ZIP 으로** 다운로드된다. `~/Downloads/<파일명>.zip` 안에 `tripo_convert_<uuid>.fbx` 와 텍스처가 든 `.fbm` 폴더가 들어 있다.
 
