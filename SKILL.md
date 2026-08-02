@@ -48,7 +48,7 @@ for m in addon_utils.modules():
 ## 전체 흐름
 
 ```
-① 로그인 → ② 생성(T-Pose) → ③ 리깅 없이 다운로드
+① 로그인 → ② 생성(T-Pose · **다리 모음**) → ③ 리깅 없이 다운로드
   → ④ ARP 리깅 (Smart → **Match to Rig** → Bind) → ⑤ Mixamo 본 이름으로 export
   → ⑥ 리그 검증 → ⑦ **rest pose 보정(.blend)** → ⑧ texture-pack(16방향 5행동)
   → ⑨ 아틀라스 검증
@@ -61,14 +61,17 @@ for m in addon_utils.modules():
 
 **완료 조건** — 아래를 다 통과해야 "됐다" 고 말한다:
 
-1. ④ `Match to Rig` 를 눌렀다(안 누르면 Bind·Export 가 거부한다)
-2. ⑥ `verify_mixamo_rig.py` 종료 코드 0
-3. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `.blend` 생성
-4. ⑧ 렌더 로그에 `애니 소스 : 캐릭터 내장(built-in)` + `####ANIM <행동> ← '<액션>'` 이
+1. ② 생성 결과가 **양다리·양발을 모은** T-포즈다 — 벌어졌으면 **③ 으로 넘어가지 않고
+   재생성**한다. ④ 이후에는 사실상 못 고친다(② 의 [다리 절](#다리와-발은-반드시-모은다) 참조)
+2. ④ `Match to Rig` 를 눌렀다(안 누르면 Bind·Export 가 거부한다)
+3. ⑥ `verify_mixamo_rig.py` 종료 코드 0
+4. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `.blend` 생성
+5. ⑧ 렌더 로그에 `애니 소스 : 캐릭터 내장(built-in)` + `####ANIM <행동> ← '<액션>'` 이
    **5줄**, `####WARN … 정적` 이 **0줄**
-5. ⑨ `verify_cells` 잘림 경고 없음 + **낱장 프레임 몽타주를 눈으로 확인**
-   (행동 5종이 서로 다른 포즈인가 · 팔이 만세가 아닌가 · 16방향이 실제로 도는가)
-5. 앱에서 실제로 로드된다 — ⚠️ **로더가 폴더 이름 기반으로 전환되는 중이다**(③ 참조).
+6. ⑨ `verify_cells` 잘림 경고 없음 + **낱장 프레임 몽타주를 눈으로 확인**
+   (행동 5종이 서로 다른 포즈인가 · 팔이 만세가 아닌가 · **걷기에서 다리가 벌어져 있지
+   않은가** · 16방향이 실제로 도는가)
+7. 앱에서 실제로 로드된다 — ⚠️ **로더가 폴더 이름 기반으로 전환되는 중이다**(③ 참조).
    전환이 끝나기 전에는 이 항목이 굽는 쪽의 실패가 아닐 수 있다
 
 ## ① 로그인
@@ -97,8 +100,10 @@ Google 이 차단한다. 이메일 인증 코드를 쓴다.
 
 1. 생성 패널의 **4번째 아이콘(연필)** 을 눌러 텍스트 모드로 전환 (기본은 이미지 업로드 모드)
 2. 프롬프트 입력 — textarea 는 native setter + `input` 이벤트로 채운다(참조 문서)
-3. **`T-Pose` 토글 ON** — ARP 의 마커 자동 배치 정확도가 크게 달라진다
+3. **`T-Pose` 토글 ON** — ARP 의 마커 자동 배치 정확도가 크게 달라진다.
+   ⚠️ **이 토글은 팔만 수평으로 편다. 다리 간격은 보장하지 않는다** — 아래 절 참조
 4. `Generate Model` 클릭
+5. **생성 결과의 다리를 확인한다** — 벌어졌으면 ③ 으로 넘어가지 않고 **재생성**한다
 
 **생성에 3~5분 걸린다.** 백그라운드 대기 후 스크린샷으로 확인할 것. 55~65 크레딧.
 
@@ -110,16 +115,45 @@ Mixamo 애니메이션은 인간형 리그 전용이고, ARP 의 humanoid 리그
 
 ```
 A male astronaut colonist in a white and orange sci-fi spacesuit, full body,
-standing in T-pose with both arms straight out horizontally, humanoid proportions
-with two arms and two legs, sealed helmet with dark reflective visor, life support
-backpack, armored chest plate, gloves and boots, symmetrical, clean topology, game-ready
+standing in T-pose with both arms straight out horizontally,
+legs together and straight with both feet touching side by side, ankles together,
+humanoid proportions with two arms and two legs, sealed helmet with dark reflective
+visor, life support backpack, armored chest plate, gloves and boots, symmetrical,
+clean topology, game-ready
 ```
 
 필수 요소: `humanoid proportions`, `two arms and two legs`,
-`standing in T-pose with arms straight out horizontally`, `symmetrical`, `game-ready`
+`standing in T-pose with arms straight out horizontally`,
+**`legs together and straight with both feet touching side by side`**,
+`symmetrical`, `game-ready`
 
 사용자가 "거미 몬스터", "용" 처럼 비인간형을 요청하면 Mixamo 애니메이션 적용이 불가능함을
 알리고 인간형으로 조정할지 확인할 것.
+
+### 다리와 발은 반드시 모은다
+
+🛑 〔원저자 지시 2026-07-31〕 **T-포즈는 팔에 대한 규격이지 다리에 대한 규격이 아니다.**
+표준 T-포즈 참고 이미지는 다리를 어깨너비로 벌리고 있고, `T-Pose` 토글도 팔만 수평으로
+편다. 그래서 **다리를 모으라고 프롬프트에 직접 쓰지 않으면 벌어진 채 생성된다.**
+
+**리깅은 모델의 자세를 그대로 rest pose 로 굳힌다.** ARP 는 메시 형상에서 본 위치를 잡으므로
+다리가 벌어진 모델에서는 **다리가 벌어진 리그**가 나오고, 그 벌어짐이 이후 전부에 남는다:
+
+| 어디서 | 무슨 일이 | 왜 |
+|---|---|---|
+| ⑦ 리타게팅 | 걷기·달리기가 **다리를 벌린 채** 재생된다 | 보정식이 `(src_pose @ src_rest⁻¹) @ tgt_rest` 다. Mixamo 에서 가져오는 것은 **rest 대비 회전차**뿐이고 기준 자세는 **우리 리그의 rest**(=벌어진 다리)다. 벌어짐은 상쇄 대상이 아니라 **기준값**이라 그대로 더해진다 |
+| ⑧ 렌더 | 캐릭터가 **작게** 그려진다 | 실루엣이 옆으로 넓어지는데 셀 프레이밍은 bbox 기준이다 |
+| 게임 화면 | 걸을 때 **어기적거린다** | 위 둘의 합 |
+
+🛑 **③ 이후에는 못 고친다.** 리그만 모으면 메시가 안 따라와 웨이트가 어긋나고, 메시까지
+같이 고치는 것은 재생성보다 비싸다. **다리를 벌린 결과가 나오면 그 자리에서 재생성한다** —
+크레딧 55~65 가 다시 들므로 **사용자에게 먼저 알리고 진행**한다.
+
+확인 방법 — 생성 결과 미리보기를 **정면에서** 보고:
+
+- 양발 안쪽 면이 **닿아 있거나 주먹 하나 폭 이내**인가
+- 무릎이 곧게 펴져 있는가(굽혀 있으면 rest 가 어중간해져 같은 문제가 난다)
+- 발끝이 **정면(−Y)** 을 보는가 — 바깥으로 벌어진 발은 걸을 때 팔자로 보인다
 
 ### 폴리곤은 나중에 줄인다
 
@@ -200,6 +234,9 @@ Blender MCP(`mcp__blender__*`)가 붙어 있으면 **화면을 보면서** 조�
    - `Object > Apply > All Transforms` — **스케일이 1 이 아니면 ARP 가 어긋난다**
    - 키가 실제 사람 크기(약 1.7~1.8)인지 확인. cm 단위로 오면 0.01 배
    - 페이스가 많으면 여기서 `Decimate`(COLLAPSE) 로 3만 안팎까지 줄인다
+   - 🛑 **다리가 벌어져 있지 않은지 정면에서 확인한다 — 여기가 마지막 관문이다.**
+     벌어진 채 리깅하면 rest pose 가 벌어진 리그가 되어 **걷기·달리기가 다리를 벌린 채**
+     재생된다. 되돌리려면 ② 부터 다시다([다리 절](#다리와-발은-반드시-모은다) 참조)
 
 2. **ARP Smart — 마커 배치**
    - `Auto-Rig Pro: Smart` 패널 → `Get Selected Objects` (메시 선택 상태에서)
@@ -335,6 +372,10 @@ probe.location = (1.1, m.y, m.z)
 | `hand` | (0.70, −0.05, 1.375) | 단면 `dz` 가 0.103→0.084 로 꺾이는 x |
 | `root` | (0, −0.08, 1.00) | 가랑이(z=0.95) 바로 위 |
 | `foot` | (0.17, −0.02, 0.10) | 발 x 범위 0.10~0.27 의 중앙 |
+
+⚠️ **이 `foot` 값은 다리를 벌린 옛 모델에서 잰 것이다**(양발 중심 간격 0.34m). ② 대로
+다리를 모아 생성했다면 **훨씬 작은 x** 가 나온다 — 표를 베끼지 말고 **매번 메시에서 다시
+잰다.** 모은 모델에 벌어진 좌표를 쓰면 다리 본이 몸 밖으로 나가 웨이트가 무너진다.
 
 ## ⑤ Mixamo 본 이름으로 export
 
@@ -544,6 +585,9 @@ python3 .claude/skills/texture-packer/scripts/verify_cells.py --frames outputs/<
 - 5행동이 모두 **다른 포즈**인가 (전부 같으면 애니메이션이 안 붙은 것 → ⑥ 재실행)
 - 16방향이 실제로 돌아가는가
 - 팔다리가 뒤틀리지 않았는가 (뒤틀렸으면 ④ 의 마커 위치 → 재리깅)
+- **`walk`·`run` 에서 다리를 벌린 채 걷지 않는가** — 정면(`S`)·후면(`N`) 프레임에서
+  두 다리 사이가 계속 벌어져 있으면 **모델 자체가 다리를 벌리고 생성된 것**이다.
+  리깅·리타게팅의 실패가 아니므로 ⑥·⑦ 을 다시 돌려도 바뀌지 않는다 → ② 부터 재생성
 - 발 높이가 행동별로 튀지 않는가 (`align_feet` 가 맞추지만 확인은 필요)
 
 ## 산출물
@@ -585,6 +629,9 @@ assets/pc/<NAME>/
 - **④ 는 GUI 작업이라 자동으로 끝나지 않는다.** 마커 확인과 웨이트 확인은 사람이 본다.
   MCP 로 자동화하더라도 **마커 위치와 최종 아틀라스는 반드시 이미지로 보여준다**
 - **크레딧 소모** — 생성 55~65, Export 40 정도. **리깅 20 은 이제 들지 않는다**
+- **② 에서 다리가 벌어져 나오면 재생성이 유일한 답이다**(크레딧 55~65 재소모).
+  ③ 으로 넘어가기 전에 **미리보기를 보여 주고 재생성 여부를 먼저 묻는다** — 리깅까지
+  진행한 뒤에 발견하면 리깅·리타게팅 시간까지 통째로 버린다
 - 애니메이션 폴더에 **실제로 무엇이 있는지** — 없는 행동은 정적 프레임이 된다
 - 아틀라스 크기·프레임 수는 조정 가능하다(위 표) — 용량이 문제면 프레임을 줄인다
 - **⑦ 이 생기면서 산출물이 하나 늘었다** — `<NAME>.blend` 가 sheet.py 의 입력이다.
@@ -618,6 +665,8 @@ assets/pc/<NAME>/
 | 캐릭터가 100배 크기로 export 됨 | `arp_units_x100` 이 **기본 ON** 이다(⑤). 아틀라스만 보면 프레이밍이 bbox 기준이라 안 드러난다 |
 | 아틀라스 PNG 가 유난히 크다 | 색 압축이 건너뛰어졌다 — `scripts/compress_image.py` 부재(⑧ 참조) |
 | 팔이 뒤틀림 | 생성 시 T-Pose 토글 누락, 또는 Twist 본을 export 했다(`arp_export_twist` 는 **기본 ON**) |
+| **걷기·달리기에서 다리를 벌리고 어기적거림** | 모델이 **다리를 벌린 채 생성**돼 그 자세가 rest pose 로 굳은 것이다. 리타게팅은 rest 대비 **회전차**만 옮기므로 벌어짐은 기준값으로 남는다 — ⑥·⑦ 을 다시 돌려도 안 바뀐다. **② 부터 재생성**(크레딧 재소모, 사용자 확인 후) |
+| 다리 본이 몸 밖으로 나감 | ④-B 표의 `foot` 좌표(벌린 모델 실측값)를 그대로 베꼈다. **매번 메시에서 다시 잰다** |
 | 구운 아틀라스가 게임에 안 보임 | 로더가 아직 `PcGender`(`male`·`female`) 기반이다 — 폴더 이름 기반 전환이 다른 팀에서 진행 중. **굽는 쪽의 실패가 아니다**(③·산출물 참조) |
 | 프레임이 셀 밖으로 잘림 | `verify_cells.py` 가 제안하는 `--scale-<action>` 을 적용해 재굽기 |
 | background 에서 `arp_debug_mode` AttributeError | ARP 의 GUI 핸들러. **무해하다** — 그 아래 출력을 본다 |

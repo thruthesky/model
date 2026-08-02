@@ -110,15 +110,20 @@ Generate Model 패널 상단에 아이콘 버튼 4개가 있다: `[이미지] [3
 
 ```
 A menacing humanoid AI robot monster, full body, standing in T-pose with both arms
-straight out horizontally, humanoid proportions with two arms and two legs,
+straight out horizontally, legs together and straight with both feet touching side by
+side, ankles together, humanoid proportions with two arms and two legs,
 heavy mechanical armor plating, glowing red eyes, symmetrical, clean topology, game-ready
 ```
 
-필수 요소: `humanoid proportions`, `two arms and two legs`, `standing in T-pose with arms straight out horizontally`, `symmetrical`, `game-ready`
+필수 요소: `humanoid proportions`, `two arms and two legs`, `standing in T-pose with arms straight out horizontally`, **`legs together and straight with both feet touching side by side`**, `symmetrical`, `game-ready`
+
+🛑 **다리를 모으라는 문구를 빼지 말 것**〔원저자 지시 2026-07-31〕. T-포즈는 **팔에 대한 규격**이라 다리는 벌어진 채로 나오는데, 리깅이 그 자세를 그대로 rest pose 로 굳혀 **걷기·달리기가 다리를 벌린 채** 재생된다. 리타게팅으로도 못 고친다(회전차만 옮기고 기준 자세는 우리 리그 것을 쓴다) → [SKILL.md ②](../SKILL.md#다리와-발은-반드시-모은다).
 
 ### 3. T-Pose 토글
 
 프롬프트 입력창 아래 `T-Pose` 버튼을 켠다. 리깅 품질이 눈에 띄게 좋아진다.
+
+⚠️ **이 토글은 팔만 수평으로 편다.** 다리 간격은 토글이 아니라 **프롬프트**로만 제어된다 — 위 필수 요소를 반드시 포함할 것.
 
 ### 4. 생성
 
