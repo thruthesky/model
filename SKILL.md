@@ -62,6 +62,8 @@ for m in addon_utils.modules():
 **완료 조건** — 아래를 다 통과해야 "됐다" 고 말한다:
 
 1. ④ `Match to Rig` 를 눌렀다(안 누르면 Bind·Export 가 거부한다)
+1. ⑤ `arp_export_mixamo.py` 종료 코드 0 — 로그에 `verify … leftover_count: 0`
+   (**⑤ 는 GUI 가 아니라 명령 한 줄이다**. 여기서 막혔다고 mixamo.com 으로 우회하지 말 것)
 2. ⑥ `verify_mixamo_rig.py` 종료 코드 0
 3. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `.blend` 생성
 4. ⑧ 렌더 로그에 `애니 소스 : 캐릭터 내장(built-in)` + `####ANIM <행동> ← '<액션>'` 이
@@ -150,13 +152,23 @@ backpack, armored chest plate, gloves and boots, symmetrical, clean topology, ga
 
 다이얼로그 **안**의 `Export` 는 `evaluate_script` 로 눌러도 된다(마지막 버튼 패턴).
 
-받은 뒤 **sheet.py 가 기대하는 자리**에 푼다 — 폴더 이름이 곧 자산 이름이다:
+🛑 **내려받은 Tripo ZIP 원본은 `outputs/tripo3d.ai/` 에 보관한다**〔원저자 지시 2026-08-06〕.
+`outputs/` 는 `.gitignore` 에 있어 저장소를 오염시키지 않는다. ZIP 을 남겨 두면 **리깅을
+다시 할 때 Tripo 크레딧을 다시 쓰지 않아도 된다** — 생성 55~65 + Export 40 이 그냥 날아가는
+것을 막는 유일한 보험이다.
+
+```bash
+mkdir -p outputs/tripo3d.ai
+mv ~/Downloads/"<이름>_raw.zip" outputs/tripo3d.ai/    # 원본 ZIP 보관(재사용·재리깅용)
+```
+
+그 다음 **sheet.py 가 기대하는 자리**에 푼다 — 폴더 이름이 곧 자산 이름이다:
 
 ```bash
 NAME=colonist                     # 자산 이름 = 폴더명 = 화면에 보이는 캐릭터 이름
 DST=game-assets/characters/pc/male/$NAME       # pc 는 중간 단계가 하나 더 필요하다(아래)
 mkdir -p "$DST"
-unzip -o ~/Downloads/"<이름>_raw.zip" -d "$DST"
+unzip -o outputs/tripo3d.ai/"<이름>_raw.zip" -d "$DST"
 # 서브셸로 감싼다 — cd 가 남으면 이후 상대 경로 명령이 조용히 엉뚱한 곳을 본다
 ( cd "$DST" \
   && mv tripo_convert_*.fbx  ${NAME}_raw.fbx \
@@ -336,14 +348,45 @@ probe.location = (1.1, m.y, m.z)
 | `root` | (0, −0.08, 1.00) | 가랑이(z=0.95) 바로 위 |
 | `foot` | (0.17, −0.02, 0.10) | 발 x 범위 0.10~0.27 의 중앙 |
 
-## ⑤ Mixamo 본 이름으로 export
+## ⑤ Mixamo 본 이름으로 export — **명령 한 줄, GUI 불필요** 🛑
 
-ARP 의 **Game Engine Export** 가 컨트롤러를 걷어내고 deform 본만 남긴 스켈레톤을 굽는다.
-이때 **Rename Bones from File** 로 본 이름을 Mixamo 규격으로 바꾼다.
+```bash
+blender --background --python .claude/skills/model/scripts/arp_export_mixamo.py -- \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>_rig.blend \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx
+echo "종료코드=$?"        # 0 = 통과, 1 = 실패
+```
+
+🛑 **④ 와 달리 이 단계는 `--background` 로 완주한다. GUI 를 띄우지 말 것.**
+`ARP_OT_GE_export_fbx_panel.execute()` 가 `ARP_OT_export.execute()` 를 그대로 부르므로
+(`auto_rig_ge.py:11842-11843`), `'EXEC_DEFAULT'` 로 호출하면 파일 브라우저 `invoke` 를
+건너뛰고 바로 실행된다. 실측(2026-08-06 `suit_bot`) — `{'FINISHED'}` · 4.2MB FBX ·
+⑥ 검증 **22/22 역할 · 교집합 52 · 경고 0줄** · ⑦ 리타게팅 `[OK]` 5줄.
+
+⚠️ **"ARP 로는 Mixamo 호환 리그를 만들 수 없다" 고 판단하고 mixamo.com 웹 업로드로 우회한
+이력이 있다(2026-08-03 `suit_bot`).** 그것은 사실이 아니었다 — ④ 리깅은 이미 성공해 있었고
+(`suit_bot_rig.blend.log.json` 의 `match_to_rig`·`bind_to_rig` 모두 ok), **없던 것은 이
+export 를 실행하는 코드뿐**이었다. ④ 에 붙은 "GUI 작업이라 자동화하지 않는다" 는 단서를
+⑤ 까지 확대 해석하면 같은 실수를 반복한다. **④ 만 GUI, ⑤ 부터는 전부 자동이다.**
+
+스크립트가 대신 해 주는 것 셋(전부 실측으로 필요했던 것):
+
+| | 무엇 | 안 하면 |
+|---|---|---|
+| **텍스처 경로 복구** | Tripo ZIP 을 `<NAME>_raw.*` 로 rename 하면 blend 안 이미지가 옛 `tripo_convert_*.fbm` 을 가리킨 채 남는다 | `embedding file … failed` → **텍스처 없는 회색 스프라이트** |
+| **spine 4분할 보정** | `spine_count=3` 이면 ARP 가 export 에서 `spine_03.x` 를 지운다(`auto_rig_ge.py:6322`). `set_spine(4)` + `match_to_rig()` 로 되살린다 | `mixamorig:Spine2` 가 비어 **21/22** · 상체 굽힘 한 마디 손실 |
+| **export 후 자가 검증** | 결과 FBX 를 다시 열어 `mixamorig:*` 본이 실제로 들어갔는지 확인 | rename 실패를 ⑧ 렌더까지 가서야 발견 |
+
+옵션 — `--rename-fp <표>` · `--keep-twist` · `--units-x100` · `--no-spine-fix`.
+결과·경고는 `<NAME>.fbx.log.json` 에도 남는다.
 
 🛑 **④-3 의 `Match to Rig` 를 안 눌렀으면 여기서도 거부당한다**
-(`'Click "Match to Rig" before exporting'` — `auto_rig_ge.py:1648-1652`). 리그를 손본 뒤
+(`'Click "Match to Rig" before exporting'` — `auto_rig_ge.py:1651`). 스크립트가
+`has_match_to_rig` 를 먼저 확인해 **ARP 가 거부하기 전에** 알려 준다. 리그를 손본 뒤
 Export 하러 왔다면 **`Match to Rig` 를 다시 누르고 온다.**
+
+<details>
+<summary>GUI 로 직접 할 때의 설정표 (스크립트가 그대로 적용한다)</summary>
 
 | ARP 설정 | 값 | 기본값 | 왜 |
 |---|---|---|---|
@@ -356,6 +399,8 @@ Export 하러 왔다면 **`Match to Rig` 를 다시 누르고 온다.**
 | Metacarpal Fingers (`arp_ge_export_metacarp`) | OFF | OFF | Mixamo 손 계층에 대응 마디가 없다 |
 | Engine Type (`arp_engine_type`) | `OTHERS` 권장 | `UNITY` | 본 이름은 매핑표가 정하므로 대개 그대로 둬도 되지만, 엔진별 추가 rename 규칙을 타지 않게 `OTHERS` 가 안전하다 |
 | Bake Animation (`arp_bake_anim`) | **OFF** | ON | 이 단계에서는 **리그만** 내보낸다. 애니메이션은 ⑦ 이 별도로 붙인다 |
+
+</details>
 
 [scripts/arp_to_mixamo.txt](scripts/arp_to_mixamo.txt) 가 `root.x = mixamorig:Hips` 형태로
 **몸통 6 · 팔 8 · 다리 8 · 손가락 30** 을 매핑한다. ARP 의 `rename_custom()` 이 `=` 로
@@ -599,6 +644,8 @@ assets/pc/<NAME>/
 | 버튼을 눌렀는데 아무 일도 안 일어남 | `evaluate_script` 대신 **`click` 도구에 uid**. 크레딧 차감으로 실행 확인 |
 | 다운로드가 오지 않음 | 8k 텍스처가 원인. `2k` 로 재시도(크레딧은 차감되므로 처음부터 2k) |
 | `Model count limit exceeded` | 계정 저장 한도 초과. 에셋 삭제는 되돌릴 수 없으므로 **반드시 사용자 확인 후** |
+| **"ARP 로는 Mixamo 리그를 못 만든다" 는 판단에 도달** | 🛑 **거의 항상 오진이다.** ④ 로그(`<NAME>_rig.blend.log.json`)에 `match_to_rig`·`bind_to_rig` 가 있으면 리깅은 성공한 것이고, 남은 것은 ⑤ 를 **실행하지 않은 것**뿐이다. `arp_export_mixamo.py` 를 돌려 볼 것 — mixamo.com 웹 업로드로 우회하기 전에 반드시(2026-08-03 실제 오진) |
+| ⑤ 를 GUI 로 해야 하는 줄 알고 멈춤 | ④ 만 GUI 다. ⑤ 는 `--background` 로 완주한다(⑤ 참조) |
 | ARP `Go!` 에서 실패 | 스케일이 1 이 아니거나(Apply All Transforms) 메시가 여러 개로 쪼개져 있다 |
 | **`Click "Match to Rig" before binding/exporting`** | ④-3 을 건너뛴 것이다. reference bones 를 손본 뒤에도 **다시 눌러야** 한다 |
 | ARP 리그가 몸에 안 맞음 | 마커 위치 문제. 헬멧·백팩이 있으면 목·어깨를 손으로 옮긴다 |
@@ -617,6 +664,8 @@ assets/pc/<NAME>/
 | `_append_arp` 가 `space_data … NoneType` 로 죽음 | MCP 실행 컨텍스트에 3D 뷰가 없다. `bpy.app.timers` 안에서 `temp_override(window, area, region)` 로 실행(④-A 5번) |
 | 캐릭터가 100배 크기로 export 됨 | `arp_units_x100` 이 **기본 ON** 이다(⑤). 아틀라스만 보면 프레이밍이 bbox 기준이라 안 드러난다 |
 | 아틀라스 PNG 가 유난히 크다 | 색 압축이 건너뛰어졌다 — `scripts/compress_image.py` 부재(⑧ 참조) |
+| **스프라이트가 회색·무채색으로 나옴** | 텍스처 경로가 깨졌다. Tripo ZIP 을 `_raw` 로 rename 하면 blend 안 이미지가 옛 `tripo_convert_*.fbm` 을 가리킨다. `arp_export_mixamo.py` 가 자동 복구하지만, 로그의 `texture_paths … missing` 이 비어 있는지 확인할 것 |
+| 검증이 **21/22**(`spine2` 비었다) | `spine_count=3`. `arp_export_mixamo.py` 가 `set_spine(4)`+`match_to_rig()` 로 자동 보정한다(`--no-spine-fix` 로 끌 수 있다) |
 | 팔이 뒤틀림 | 생성 시 T-Pose 토글 누락, 또는 Twist 본을 export 했다(`arp_export_twist` 는 **기본 ON**) |
 | 구운 아틀라스가 게임에 안 보임 | 로더가 아직 `PcGender`(`male`·`female`) 기반이다 — 폴더 이름 기반 전환이 다른 팀에서 진행 중. **굽는 쪽의 실패가 아니다**(③·산출물 참조) |
 | 프레임이 셀 밖으로 잘림 | `verify_cells.py` 가 제안하는 `--scale-<action>` 을 적용해 재굽기 |
