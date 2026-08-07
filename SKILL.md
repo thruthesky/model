@@ -1,33 +1,57 @@
 ---
 name: model
-description: Tripo3D(tripo3d.ai)로 3D 캐릭터를 생성해 리깅 없이 곧바로 내려받고, Blender 의 Auto-Rig Pro 애드온으로 Mixamo 규격 리그(mixamorig:* 본)를 입힌 뒤, game-assets/animations/default 의 Mixamo 애니메이션(idle·walk·run·attack·death)을 적용해 texture-packer 의 sheet.py 로 16방향 packed atlas(Flame flame_texturepacker)를 굽는다. 다음 요청에 사용할 것 - "3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", 생성한 모델에 "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "PC 를 스프라이트로 만들어줘", "16방향 아틀라스 만들어줘", "도형 대신 캐릭터 그림 넣어줘", 또는 리깅 결과를 "Blender 로 보여줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, 16방향 5행동 texture-pack 까지 전 과정을 다룬다.
+description: 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
 ---
 
 # Tripo3D 캐릭터 → Auto-Rig Pro(Mixamo 리그) → 16방향 스프라이트 아틀라스
 
-텍스트 프롬프트로 3D 캐릭터를 만들고, Blender 에서 리깅하고, Mixamo 애니메이션을 입혀,
-**게임에 넣을 수 있는 packed atlas** 로 굽는 전 과정.
+텍스트 프롬프트로 3D 캐릭터를 만들고, 리깅하고, Mixamo 애니메이션을 입혀,
+**게임에 넣을 수 있는 packed atlas** 로 굽는 전 과정. **두 단계로 나뉜다.**
+
+## 🔀 두 단계 — 어디까지 필요한가
+
+```
+Phase A ── 3D 자산 ─────────────────────────┐
+① 로그인 → ② 생성(T-Pose) → ③ 리깅 없이 다운로드
+  → ④ ARP 리깅 (Smart → Match to Rig → Bind)
+  → ⑤ Mixamo 본 이름으로 export → ⑥ 리그 검증
+  → ⑦ rest pose 보정  ➜ **<NAME>.blend** (애니 5종 포함)
+                                            │
+             ← 3D 만 필요하면 여기서 끝 ───┘
+                                            ↓
+Phase B ── 2.5D 아틀라스 ───────────────────
+⑧ texture-pack(16방향 5행동) → ⑨ 아틀라스 검증
+                     ➜ **<NAME>.png + <NAME>.atlas**
+```
+
+| | **Phase A — 3D** | **Phase B — 2.5D** |
+|---|---|---|
+| 하는 일 | 생성·리깅·애니 적용 | 스프라이트 렌더·패킹 |
+| 산출물 | **`<NAME>.blend`**(애니 5종 내장) | `<NAME>.png` + `<NAME>.atlas` |
+| 소유 코드 | 이 스킬의 `scripts/` | **[texture-packer 스킬](../texture-packer/SKILL.md)** 의 `sheet.py` |
+| 자동화 | ④ 만 GUI, 나머지 전부 명령 | 전부 명령 |
+| 대략 소요 | 생성 4분 · 리깅 15분 · 보정 2분 | 1분 30초~3분 |
+
+🛑 **경계는 ⑦ 뒤다. ⑤ 의 `<NAME>.fbx` 를 "3D 완성" 으로 착각하지 말 것** — 그것은
+`arp_bake_anim=False`(`scripts/arp_export_mixamo.py` `run()`)로 내보낸 **뼈대만 있는 파일**이라
+애니메이션이 하나도 들어 있지 않다. "Mixamo 애니메이션 적용까지" 를 만족하는 산출물은
+⑦ 이 만드는 **`<NAME>.blend`** 하나뿐이다.
 
 ⚠️ **Tripo 의 오토 리깅(Animate 탭)을 쓰지 않는다**〔원저자 지시 2026-07-30〕. 생성한 모델을
 **리깅하지 않은 채로 내려받아** Blender 의 **Auto-Rig Pro** 로 리깅한다. 크레딧 20 을 아끼는
 것보다 중요한 이유가 둘 있다:
 
 - **본 이름을 우리가 정한다.** ARP export 단계에서 `mixamorig:*` 규격으로 rename 하므로
-  Mixamo 애니메이션이 **리타게팅 없이** 그대로 붙는다(아래 ⑥ 참조). Tripo 리그(41본,
+  Mixamo 애니메이션이 **리타게팅 없이** 그대로 붙는다(⑤ 참조). Tripo 리그(41본,
   `Hip`/`L_Upperarm` 식)는 매번 본 매핑을 거쳐야 했다.
 - **손가락이 움직인다.** Tripo v1.0 Humanoid 리그에는 손가락 본이 없어 주먹 쥐기가
   손목 회전으로만 남았다. ARP 는 손가락 3마디를 만든다.
-
-⚠️ **최종 산출물은 GLB 가 아니라 `.png` + `.atlas` 다.** 이 저장소는 `flutter_scene`(3D)을
-쓰지 않는다(원저자 확정 2026-07-30 — 루트 `CLAUDE.md`). 런타임은 Flame 2.5D 아이소메트릭이고
-캐릭터는 **16방향 프리렌더 스프라이트**다. GLB 를 만드는 옛 경로는 아래
-[레거시](#레거시--glb-경로) 절에 축소해 남겨 두었다.
 
 ## 준비 확인
 
 ```bash
 which blender && blender --version | head -1      # 실측: 5.1.2
-ls game-assets/animations/default/*.fbx           # idle walk run attack death
+ls game-assets/animations/default/*.fbx           # 실제로 무엇이 있는지 눈으로 볼 것
 
 # ARP 는 여러 벌 설치될 수 있다(실측: user_default 3.78.18 + superhivemarket_com 3.78.34).
 # 버전을 문서에 고정하지 말고 **활성본을 실행 전에 확인**한다 — 같은 함수가 버전마다
@@ -42,36 +66,16 @@ for m in addon_utils.modules():
 - **Auto-Rig Pro 는 유료 애드온이다.** 없으면 사용자에게 설치를 요청한다.
   이 문서의 ARP 인용 줄 번호는 **활성본 3.78.18**(`extensions/user_default/`) 기준이다.
 - **Chrome DevTools MCP** 가 있어야 Tripo 를 조작할 수 있다. 없으면 사용자에게 알린다.
-- 애니메이션 폴더에 **실제로 무엇이 있는지 먼저 확인하고 사용자에게 알린다.**
-  5개를 가정하지 말 것.
+- 🛑 **애니메이션 폴더에 실제로 무엇이 있는지 먼저 확인하고 사용자에게 알린다.**
+  실측: 폴더에는 `idle walk run attack death` + **`hit` 까지 6개**가 있지만,
+  **`hit` 은 2026-07-20 규격에서 제외됐고 쓰는 것은 5개**다
+  (`sheet.py` `DEFAULT_ACTIONS`). **존재 ≠ 사용** — `hit` 을 되살리면 캐릭터마다
+  8프레임 × 16방향 = **128셀**이 더 붙어 디스크·RAM 만 커진다(런타임은 hit 상태를
+  같은 방향 idle 로 폴백해 그린다).
 
-## 전체 흐름
+---
 
-```
-① 로그인 → ② 생성(T-Pose) → ③ 리깅 없이 다운로드
-  → ④ ARP 리깅 (Smart → **Match to Rig** → Bind) → ⑤ Mixamo 본 이름으로 export
-  → ⑥ 리그 검증 → ⑦ **rest pose 보정(.blend)** → ⑧ texture-pack(16방향 5행동)
-  → ⑨ 아틀라스 검증
-```
-
-**⑥ 과 ⑨ 를 건너뛰면 실패를 놓친다.** 이 파이프라인의 실패는 대부분 예외가 아니라
-"돌기는 했는데 캐릭터가 안 움직인다"·"움직이는데 자세가 틀렸다" 로 나타난다 — 본 이름이
-하나 어긋나면 sheet.py 는 경고 없이 **정적 프레임**을 굽고, 이름이 다 맞아도 rest pose 가
-다르면 **팔이 만세인 스프라이트**를 굽는다(⑦ 참조).
-
-**완료 조건** — 아래를 다 통과해야 "됐다" 고 말한다:
-
-1. ④ `Match to Rig` 를 눌렀다(안 누르면 Bind·Export 가 거부한다)
-1. ⑤ `arp_export_mixamo.py` 종료 코드 0 — 로그에 `verify … leftover_count: 0`
-   (**⑤ 는 GUI 가 아니라 명령 한 줄이다**. 여기서 막혔다고 mixamo.com 으로 우회하지 말 것)
-2. ⑥ `verify_mixamo_rig.py` 종료 코드 0
-3. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `.blend` 생성
-4. ⑧ 렌더 로그에 `애니 소스 : 캐릭터 내장(built-in)` + `####ANIM <행동> ← '<액션>'` 이
-   **5줄**, `####WARN … 정적` 이 **0줄**
-5. ⑨ `verify_cells` 잘림 경고 없음 + **낱장 프레임 몽타주를 눈으로 확인**
-   (행동 5종이 서로 다른 포즈인가 · 팔이 만세가 아닌가 · 16방향이 실제로 도는가)
-5. 앱에서 실제로 로드된다 — ⚠️ **로더가 폴더 이름 기반으로 전환되는 중이다**(③ 참조).
-   전환이 끝나기 전에는 이 항목이 굽는 쪽의 실패가 아닐 수 있다
+# Phase A — 3D 자산 만들기 (①~⑦)
 
 ## ① 로그인
 
@@ -112,16 +116,32 @@ Mixamo 애니메이션은 인간형 리그 전용이고, ARP 의 humanoid 리그
 
 ```
 A male astronaut colonist in a white and orange sci-fi spacesuit, full body,
-standing in T-pose with both arms straight out horizontally, humanoid proportions
-with two arms and two legs, sealed helmet with dark reflective visor, life support
-backpack, armored chest plate, gloves and boots, symmetrical, clean topology, game-ready
+standing in T-pose with both arms straight out horizontally, legs together with
+knees and feet touching, humanoid proportions with two arms and two legs, sealed
+helmet with dark reflective visor, life support backpack, armored chest plate,
+gloves and boots, symmetrical, clean topology, game-ready
 ```
 
 필수 요소: `humanoid proportions`, `two arms and two legs`,
-`standing in T-pose with arms straight out horizontally`, `symmetrical`, `game-ready`
+`standing in T-pose with arms straight out horizontally`, **`legs together with knees and
+feet touching`**, `symmetrical`, `game-ready`
 
 사용자가 "거미 몬스터", "용" 처럼 비인간형을 요청하면 Mixamo 애니메이션 적용이 불가능함을
 알리고 인간형으로 조정할지 확인할 것.
+
+### 🛑 ②-V 다리가 벌어졌으면 **재생성한다** (완료 조건 0번)
+
+다리·무릎·발이 벌어진 채로 리깅하면 걷기 모션에서 뒤뚱거리고, 그 결함은 **⑧ 에서 셀에
+맞춰 축소된 뒤에야** 눈에 띈다 — 그때는 생성부터 다시 해야 한다. **생성 직후에 판정한다.**
+
+- 눈으로: 정면 렌더에서 두 발 사이가 붙어 있는가. 무릎이 벌어지지 않았는가.
+- 수치로: 같은 저장소에 `actor` 스킬이 있으면 그 판정 스크립트를 **경로로 호출**한다
+  (파일을 이 스킬로 복사하지 말 것 — 사본이 갈라진다):
+  ```bash
+  # 있을 때만. 없으면 위의 눈 확인으로 대신한다(이 스킬은 독립 저장소라 없을 수 있다).
+  ls .claude/skills/actor/scripts/check_leg_gap.py && \
+    blender --background --python .claude/skills/actor/scripts/check_leg_gap.py -- <모델.fbx>
+  ```
 
 ### 폴리곤은 나중에 줄인다
 
@@ -165,7 +185,7 @@ mv ~/Downloads/"<이름>_raw.zip" outputs/tripo3d.ai/    # 원본 ZIP 보관(재
 그 다음 **sheet.py 가 기대하는 자리**에 푼다 — 폴더 이름이 곧 자산 이름이다:
 
 ```bash
-NAME=colonist                     # 자산 이름 = 폴더명 = 화면에 보이는 캐릭터 이름
+NAME=colonist                     # 자산 이름 = 폴더명 = 아틀라스 이름
 DST=game-assets/characters/pc/male/$NAME       # pc 는 중간 단계가 하나 더 필요하다(아래)
 mkdir -p "$DST"
 unzip -o outputs/tripo3d.ai/"<이름>_raw.zip" -d "$DST"
@@ -175,39 +195,37 @@ unzip -o outputs/tripo3d.ai/"<이름>_raw.zip" -d "$DST"
   && mv tripo_convert_*.fbm  ${NAME}_raw.fbm )   # 텍스처 폴더. FBX 와 같은 이름이어야 로드된다
 ```
 
-**`<NAME>` 이 곧 자산 이름이자 아틀라스 이름이다** — `assets/pc/<NAME>/<NAME>.atlas` 가 되고,
-**그 이름이 캐릭터 선택 화면에 그대로 보인다**〔원저자 지시 2026-07-30〕. 사람이 읽을 이름을
-붙일 것(`colonist`·`denis`·`maria`).
+**`<NAME>` 이 곧 자산 이름이자 아틀라스 이름이다** — `assets/pc/<NAME>/<NAME>.atlas` 가 된다.
+사람이 읽을 이름을 붙일 것(`colonist`·`denis`·`maria`).
 
-⚠️ **성별 구분은 없어졌다.** 예전에는 `male`·`female` 두 가지가 곧 캐릭터였지만, 지금은
-**폴더 이름이 캐릭터 종류**다. 성별로 나누지 말고 캐릭터마다 폴더를 하나 만든다.
+⚠️ **성별로 나누지 않는다.** 폴더 이름이 캐릭터 종류다 — 캐릭터마다 폴더를 하나 만든다
+〔원저자 지시 2026-07-30〕. (기존 자산이 `male_*`/`female_*` 로 되어 있는 것은 과거 명명일 뿐이다.)
+🛑 **다만 "이름을 지으면 게임 화면에 그대로 나온다" 는 뜻은 아니다** — 굽는 것과 게임에
+노출되는 것은 별개다. [§게임에 실제로 보이게 하려면](#게임에-실제로-보이게-하려면--노출은-4층이다) 참조.
 
 ⚠️ **`pc` 는 중간 폴더가 하나 더 필요하다** — `sheet.py` 가 `pc/<중간>/<NAME>/<파일>` 네
-단계를 요구하고 **끝에서 두 번째**를 자산 이름으로 쓴다(`sheet.py:553-557`). 중간 폴더의
-이름 자체는 아무 영향이 없다(분류용). 기존 자산이 `pc/male/` 아래 있어 그대로 두는 것뿐이다.
-
-🛑 **런타임 로더는 아직 전환 중이다.** [pc_atlas.dart](../../../lib/engine/actor/pc_atlas.dart)
-가 아직 `PcGender`(`male`·`female`) enum 으로 `assets/pc/<gender>/<gender>.atlas` 를 찾는다.
-폴더 이름을 그대로 보여주고 고르게 하는 작업이 **다른 팀에서 진행 중**이므로, 그 전까지는
-새 이름으로 구운 아틀라스가 앱에서 안 보일 수 있다. **굽는 쪽은 이 문서대로 진행하면 된다** —
-이름 규칙이 바뀌는 것이 아니라 로더가 따라오는 중이다.
+단계를 요구하고 **끝에서 두 번째**를 자산 이름으로 쓴다
+(`sheet.py` `infer_kind_name_from_path()` — 실측 위치 `:540-580`, 이름 추출 `:572-578`).
+중간 폴더의 이름 자체는 아무 영향이 없다(분류용).
 
 ⚠️ **raw 를 `_raw` 로 남긴다.** ⑤ 의 ARP export 가 `<NAME>.fbx` 를 쓰므로, 같은 이름으로
 풀면 원본이 덮여 리깅을 다시 하려면 Tripo 에서 다시 받아야 한다(크레딧 재소모).
 
 ⚠️ **이 폴더에 애니메이션 `.fbx` 를 두지 말 것.** `--animations` 를 생략하면 sheet.py 가
-모델과 같은 폴더의 `idle/walk/attack/death.fbx` 를 **1순위**로 집는다(`sheet.py:732`).
+모델과 같은 폴더의 `idle/walk/attack/death.fbx` 를 **1순위**로 집는다(`sheet.py:751-781`).
 우리는 `animations/default` 를 쓴다.
 
-## ④ Auto-Rig Pro 리깅 (Blender)
+## ④ Auto-Rig Pro 리깅 (Blender) — **이 단계만 GUI 다**
 
-⚠️ **이 단계는 GUI 작업이다.** ARP 의 Smart 는 마커 위치를 **눈으로 확인**해야 하고,
-모델마다 실패 양상이 다르다. `--background` 로 완전 자동화하지 않는다 — 자동으로 놓인
-마커가 어깨 하나만 어긋나도 팔이 통째로 뒤틀린 채 아틀라스까지 그대로 간다.
-Blender MCP(`mcp__blender__*`)가 붙어 있으면 **화면을 보면서** 조작한다.
+⚠️ **ARP 의 Smart 는 마커 위치를 눈으로 확인**해야 하고, 모델마다 실패 양상이 다르다.
+`--background` 로 완전 자동화하지 않는다 — 자동으로 놓인 마커가 어깨 하나만 어긋나도 팔이
+통째로 뒤틀린 채 아틀라스까지 그대로 간다. Blender MCP(`mcp__blender__*`)가 붙어 있으면
+**화면을 보면서** 조작한다.
+
+🛑 **이 "GUI 작업" 단서를 ⑤ 이후로 확대 해석하지 말 것.** ⑤~⑨ 는 전부 명령 한 줄이다.
 
 1. **임포트·정리**
-   - `File > Import > FBX` 로 `<NAME>.fbx`
+   - `File > Import > FBX` 로 `<NAME>_raw.fbx`
    - 캐릭터가 **Z-up, 발이 원점, 정면이 -Y** 를 보게 회전·이동
    - `Object > Apply > All Transforms` — **스케일이 1 이 아니면 ARP 가 어긋난다**
    - 키가 실제 사람 크기(약 1.7~1.8)인지 확인. cm 단위로 오면 0.01 배
@@ -221,7 +239,7 @@ Blender MCP(`mcp__blender__*`)가 붙어 있으면 **화면을 보면서** 조�
      추가한다(`6287`). 즉 Mixamo 의 `Spine/Spine1/Spine2` 3분할에 대응하려면 **4** 다.
      (실측: 3 으로 구운 `colonist.fbx` 는 `spine2` 역할이 비어 21/22 였다)
    - `Add Neck` / `Add Chin` / `Add Shoulders` / `Add Wrists` / `Add Spine Root`
-     / `Add Ankles` 를 차례로 눌러 마커를 놓는다 (`arp.guess_markers` 로 자동 추정 가능)
+     / `Add Ankles` 를 차례로 눌러 마커를 놓는다
    - **놓인 마커를 반드시 눈으로 확인한다.** 헬멧·백팩이 있는 우주복은 목·어깨 추정이
      자주 빗나간다
    - `Go!` (= `id.go_detect`) → **reference bones** 생성
@@ -366,8 +384,7 @@ echo "종료코드=$?"        # 0 = 통과, 1 = 실패
 ⚠️ **"ARP 로는 Mixamo 호환 리그를 만들 수 없다" 고 판단하고 mixamo.com 웹 업로드로 우회한
 이력이 있다(2026-08-03 `suit_bot`).** 그것은 사실이 아니었다 — ④ 리깅은 이미 성공해 있었고
 (`suit_bot_rig.blend.log.json` 의 `match_to_rig`·`bind_to_rig` 모두 ok), **없던 것은 이
-export 를 실행하는 코드뿐**이었다. ④ 에 붙은 "GUI 작업이라 자동화하지 않는다" 는 단서를
-⑤ 까지 확대 해석하면 같은 실수를 반복한다. **④ 만 GUI, ⑤ 부터는 전부 자동이다.**
+export 를 실행하는 코드뿐**이었다.
 
 스크립트가 대신 해 주는 것 셋(전부 실측으로 필요했던 것):
 
@@ -382,8 +399,7 @@ export 를 실행하는 코드뿐**이었다. ④ 에 붙은 "GUI 작업이라 �
 
 🛑 **④-3 의 `Match to Rig` 를 안 눌렀으면 여기서도 거부당한다**
 (`'Click "Match to Rig" before exporting'` — `auto_rig_ge.py:1651`). 스크립트가
-`has_match_to_rig` 를 먼저 확인해 **ARP 가 거부하기 전에** 알려 준다. 리그를 손본 뒤
-Export 하러 왔다면 **`Match to Rig` 를 다시 누르고 온다.**
+`has_match_to_rig` 를 먼저 확인해 **ARP 가 거부하기 전에** 알려 준다.
 
 <details>
 <summary>GUI 로 직접 할 때의 설정표 (스크립트가 그대로 적용한다)</summary>
@@ -419,14 +435,12 @@ Export 하러 왔다면 **`Match to Rig` 를 다시 누르고 온다.**
 
 `rename_custom()` 이 적용되는 대상은 원본이 아니라 GE Export 가 만드는 **임시 리그
 (`_arpexp`)** 다. ARP 는 원본 이름에서 `c_` 를 뗐다가 Humanoid 면 전부 다시 붙인다
-(`auto_rig_ge.py:8587-8589`). `human.blend` 를 열어 `use_deform` 을 실측하면 `thumb1.l` 이
-나오는데 **그건 원본 리그다** — 이 값을 매핑표에 적으면 1번 마디 10개가 조용히 rename 되지
-않는다(실측: `colonist.fbx` 에 `c_thumb1.l` 등 정확히 10개가 남았다).
+(`auto_rig_ge.py:8587-8589`).
 
-내보낼 곳은 **모델과 같은 폴더, 같은 이름**이다 — sheet.py 가 폴더명으로 자산을 식별한다:
+내보낼 곳은 **모델과 같은 폴더, 같은 이름**이다:
 
 ```
-game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx     ← ARP export 결과
+game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx     ← ARP export 결과(리그만·애니 없음)
                                 <NAME>_raw.fbx        ← ③ 의 원본. 지우지 않는다
 ```
 
@@ -435,7 +449,7 @@ game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx     ← ARP export 결과
 ```bash
 # 프로젝트 루트에서 실행한다(Blender 는 --python 경로를 cwd 기준으로 연다)
 blender --background --python .claude/skills/model/scripts/verify_mixamo_rig.py -- \
-  game-assets/characters/pc/male/<NAME>/<NAME>.fbx \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx \
   game-assets/animations/default
 echo "종료코드=$?"        # 0 = 통과, 1 = 실패
 ```
@@ -468,7 +482,7 @@ Mixamo 애니는 65본이라 **임계가 32** 다. 22역할을 다 채워도 손
 
 | 무엇이 잘못됐나 | 증상 | 원인 |
 |---|---|---|
-| rename 이 **통째로** 실패 | `sheet.py` 가 **시작도 못 하고 종료** — `❌ … Mixamo rig 가 아닙니다` | `Rename Bones from File` OFF 또는 파일 경로 오류. ARP 는 파일을 못 찾아도 `Rename Bone File not found! Skip renaming` 만 찍고 **그냥 진행**한다(`auto_rig_ge.py:10406`). 종료시키는 쪽은 `sheet.py:398-411` 의 `assert_mixamo_rig` 다 |
+| rename 이 **통째로** 실패 | `sheet.py` 가 **시작도 못 하고 종료** — `❌ … Mixamo rig 가 아닙니다` | `Rename Bones from File` OFF 또는 파일 경로 오류. ARP 는 파일을 못 찾아도 `Rename Bone File not found! Skip renaming` 만 찍고 **그냥 진행**한다(`auto_rig_ge.py:10406`). 종료시키는 쪽은 `sheet.py` `assert_mixamo_rig()`(실측 `:417-430`) 다 |
 | rename 이 **부분** 실패 | 렌더는 끝나는데 **5행동이 전부 같은 포즈** | 교집합이 임계 미달. 매핑표의 본 이름이 export 리그와 어긋난 것 |
 
 ⚠️ **background 실행 시 ARP 가 `arp_debug_mode` AttributeError 를 뱉는다**(실측).
@@ -480,7 +494,7 @@ Mixamo 애니는 65본이라 **임계가 32** 다. 22역할을 다 채워도 손
 python3 .claude/skills/model/scripts/test_verify_mixamo_rig.py    # 22개
 ```
 
-## ⑦ rest pose 보정 — **ARP 리그에는 이 단계가 반드시 필요하다** 🛑
+## ⑦ rest pose 보정 — **Phase A 의 마지막이자 계약물** 🛑
 
 ⚠️ **⑥ 이 전부 `OK` 여도 애니메이션을 그대로 쓰면 안 된다.** 검증이 통과시키는
 "리타게팅 없이 직접 적용" 은 **본 이름이 맞다**는 뜻이지 **포즈가 맞다**는 뜻이 아니다.
@@ -492,12 +506,12 @@ python3 .claude/skills/model/scripts/test_verify_mixamo_rig.py    # 22개
 
 ```bash
 blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.py -- \
-  game-assets/characters/pc/male/<NAME>/<NAME>.fbx \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx \
   game-assets/animations/default \
-  game-assets/characters/pc/male/<NAME>/<NAME>.blend
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.blend
 ```
 
-캐릭터 + 보정된 액션 5종을 담은 `.blend` 가 나온다. 이 스크립트가 지키는 것 셋:
+캐릭터 + 보정된 액션 5종을 담은 **`<NAME>.blend`** 가 나온다. 이 스크립트가 지키는 것 셋:
 
 | | 왜 |
 |---|---|
@@ -505,62 +519,128 @@ blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.p
 | 결과를 **`.blend`** 로 (FBX 아님) | 리타게팅 직후엔 정확한데, Blender 기본 exporter 로 FBX 를 내보내 다시 임포트하면 **rest 가 달라져 또 T-포즈로 벌어진다**(실측). 캐릭터 FBX 는 ARP GE Export 가, 애니 FBX 는 Blender 가 만들어 축 규약이 갈린다 |
 | `action_slot` 지정 | Blender 4.4+ 의 slotted action — slot 을 안 잡으면 액션이 **조용히 평가되지 않는다**(정적 T-포즈) |
 
-## ⑧ texture-pack — 16방향 5행동
+## ✅ Phase A 완료 조건
 
-[texture-packer 스킬](../texture-packer/SKILL.md)의 `sheet.py` 에 **⑦ 이 만든 `.blend`** 를
-주고 **`--animations built-in`** 으로 내장 액션을 쓰게 한다. `pc` kind 의 기본 행동이 정확히
-**idle · walk · attack · death · run** 이고 방향은 **16** 이다.
+여기까지 통과하면 **3D 자산이 완성된 것**이고, 2.5D 가 필요 없으면 **여기서 끝내도 된다.**
+
+0. 🛑 ②-V **다리·무릎·발이 모여 있다**(벌어졌으면 ② 재생성 — 뒤에서 고칠 수 없다)
+1. ④ `Match to Rig` 를 눌렀다 — `<NAME>_rig.blend.log.json` 에 `match_to_rig`·`bind_to_rig`
+2. ⑤ `arp_export_mixamo.py` 종료 0 — 로그에 `verify … leftover_count: 0`,
+   `texture_paths … missing` 이 **빈 배열**
+3. ⑥ `verify_mixamo_rig.py` 종료 0 (22/22 역할 · 교집합 ≥ 32)
+4. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `<NAME>.blend` 생성
+5. 계약 파일이 한 폴더에 다 있다 → 다음 절의 표
+6. (3D 로 바로 쓸 것이면) Blender 로 열어 액션 5종이 실제로 재생되는지 눈으로 확인
+
+🛑 **아틀라스는 Phase A 의 완료 조건이 아니다.**
+
+---
+
+# 🤝 Phase 경계 계약 (A → B 인계)
+
+**두 단계를 다른 세션·다른 날에 나눠 하면 여기서 사고가 난다.** Phase B 만 따로 돌릴 때는
+아래 셋을 반드시 확인하고 시작한다.
+
+## (1) 파일 — 한 폴더에 같이 있어야 한다
+
+| 파일 | 필수 | 없으면 |
+|---|---|---|
+| **`<NAME>.blend`** (⑦) | ✅ | Phase B 입력 자체가 없다 |
+| **`<NAME>_raw.fbm/`** (텍스처 폴더) | ✅ | 🛑 `.blend` 는 텍스처를 **품고 있지 않고 외부 파일로 참조**한다(`retarget_to_arp_rig.py` 는 `save_as_mainfile` 만 하고 `pack_all` 을 하지 않는다). `.blend` 만 복사해 굽으면 **회색·무채색 스프라이트**가 나온다 — 분리 후 가장 흔할 오용이다 |
+| `<NAME>.fbx` (⑤) | ⭕ | 재보정·디버깅용 보관물 |
+| `<NAME>_rig.blend` (④) | ⭕ | 재리깅 원본. 지우면 ④ GUI 부터 다시 |
+| `<NAME>_raw.fbx` (③) | ⭕ | 재리깅용 원본. 지우면 Tripo 크레딧 재소모 |
+
+## (2) 게이트 — Phase A 를 통과했다는 증거
+
+1. ⑤ 종료 0 + `<NAME>.fbx.log.json` 의 `verify.leftover_count == 0`
+2. ⑥ `verify_mixamo_rig.py` 종료 0
+3. ⑦ 로그에 `[OK] <행동>` **5줄**
+
+## (3) 인자 — `.blend` 안에 없어서 반드시 넘겨야 하는 것
+
+| 인자 | 실제 동작 | 위험도 |
+|---|---|---|
+| **`--animations built-in`** | 생략하면 모델 폴더 → `animations/<NAME>/` → `default` 순으로 자동 탐색해 **원본 Mixamo fbx** 를 집는다 → ⑦ 의 보정이 무시돼 **팔 만세 재현** | 🛑 **진짜 조용한 실패.** Phase B 단독 실행 시 반드시 명시 |
+| **`--kind`** | 비대화형에서 누락하면 **명시적으로 종료**하고, 대화형이면 물어본다. 위험은 *누락* 이 아니라 **틀린 값** — kind 하나가 방향·셀·표시크기·행동을 전부 정한다(`sheet.py` `KIND_POLICY`) | 🛑 `boss`/`minion`(8방향)을 16방향으로 굽는 것은 **명시된 회귀** |
+| `--name` | 생략하면 **모델 파일 이름**으로 기본화된다. 폴더명 = 아틀라스 이름 = 런타임 조회 키 | ⚠️ 파일명과 자산 이름이 같으면 안전 |
+| `--output` | 생략 = 프로젝트 `assets/` + `pubspec.yaml` 자동 등록 / 지정 = 그 폴더에만 저장(pubspec 손대지 않음) | ⚠️ 실패가 아니라 **정책 선택** — "후보만 굽기" 인지 "게임에 넣기" 인지 고른다 |
+
+🛑 **경로 추론은 프로젝트 트리 안에서만 된다.** `sheet.py` 의 `infer_kind_name_from_path()` 는
+`characters/<kind>/…` 형태에서만 kind·name 을 뽑고 **프로젝트 루트 밖 경로는 추론을 거부**한다.
+`outputs/` 같은 작업 폴더에서 구우면 `--kind`·`--name` 을 **직접 줘야 한다.**
+
+---
+
+# Phase B — 2.5D 아틀라스 굽기 (⑧~⑨)
+
+**입력은 ⑦ 이 만든 `<NAME>.blend`** 이고, 코드 소유자는 이 스킬이 아니라
+[texture-packer 스킬](../texture-packer/SKILL.md)이다. **옵션·발 정렬·색 압축·잘림 검사의
+SSOT 는 거기이며, 이 절은 호출 방법과 함정만 적는다.**
+
+## ⑧ texture-pack — 16방향 5행동
 
 ```bash
 python3 .claude/skills/texture-packer/scripts/sheet.py \
-  ./game-assets/characters/pc/male/<NAME>/<NAME>.blend \
+  ./game-assets/characters/pc/<중간>/<NAME>/<NAME>.blend \
   --animations built-in --auto
 ```
 
 액션 이름이 `idle`/`walk`/`run`/`attack`/`death` 라 `match_embedded` 가 정확 매칭한다
-(`_sheet_render.py:489`). 로그에 `애니 소스 : 캐릭터 내장(built-in)` 이 찍히는지 볼 것.
+(`_sheet_render.py:489`). 로그에 **`애니 소스 : 캐릭터 내장(built-in)`** 이 찍히는지 볼 것.
 
 <details>
-<summary>⑦ 없이 FBX 를 직접 주는 옛 방식 (Mixamo 로 리깅된 캐릭터에만 유효)</summary>
+<summary>⑦ 없이 FBX 를 직접 주는 옛 방식 (Mixamo 로 *리깅된* 캐릭터에만 유효)</summary>
 
 ```bash
 python3 .claude/skills/texture-packer/scripts/sheet.py \
-  ./game-assets/characters/pc/male/<NAME>/<NAME>.fbx \
+  ./game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx \
   --animations default --auto
 ```
+ARP 리그에는 쓸 수 없다 — 팔이 만세로 나온다(⑦ 참조).
 </details>
 
-경로에서 `--kind pc --name <NAME>` 이 추론되고 `--auto` 가 켜진다(`sheet.py:1730-1732`).
-`--animations default` 는 명시하는 편이 안전하다 — **명시하면 자동 탐색 블록 자체가 돌지
-않아 `default` 로 고정되기 때문**이다(`sheet.py:732`·`744` 두 블록의 조건이 모두
-`not args.animations`). 생략하면 모델 폴더 → `animations/<NAME>/` → `default` 순으로 찾다가
-의도치 않은 세트를 집을 수 있다.
+### kind 가 규격을 통째로 정한다 — SSOT 는 `sheet.py` 의 `KIND_POLICY`
 
-⚠️ **이 저장소에는 `scripts/compress_image.py` 가 없어 색 압축이 조용히 건너뛰어진다.**
-`sheet.py:1239` 는 프로젝트 루트의 그 파일을 부르는데(texture-packer 스킬 소유가 아니다),
-없으면 예외 없이 무압축으로 넘어간다. 실측 — 같은 규격인데 **4배**다:
+| kind | 방향 | 셀 | 화면 표시 | 기본 행동 |
+|---|---|---|---|---|
+| `pc` | 16 | 128 | 128 | idle · walk · attack · death · run |
+| `mob` | 16 | 128 | 128 | idle · walk · attack · death (run 제외) |
+| `npc` | **1** | 128 | 128 | idle (24프레임) |
+| `boss` | **8** | **256** | **256** | idle · walk · attack · death |
+| `minion` | **8** | **64** | **64** | idle · walk · attack · death |
 
-| | 아틀라스 페이지 | PNG |
+🛑 **`boss`(8방향) · `minion`(8방향·64셀) 을 "16방향으로 고쳐" 재생성하지 말 것 — 그것이 회귀다.**
+이 표는 편의용 사본이므로, 어긋나면 **`KIND_POLICY` 가 맞다.**
+
+### 옵션에서 실제로 자주 틀리는 것
+
+| | 사실 | 왜 중요한가 |
 |---|---|---|
-| `male`(압축됨) | 7921×763 | 1.5 MB |
-| `colonist`(압축 안 됨) | 7727×539 (더 작다) | **6.1 MB** |
+| `--auto` 와 `--scale-<action>` | **배타적이다.** `--auto` 는 `--auto-fit-scale` 을 켜고, 그러면 모든 행동 scale 이 **1.0 고정**이 되어 `--scale-*`·전역 `--scale` 이 **전부 무시**된다 | ⑨ 가 제안하는 `--scale-attack 0.85` 를 `--auto` 와 함께 주면 **아무 일도 안 일어난다**. 둘 중 하나만 쓴다 |
+| 회전 packing | 캐릭터 계열(`pc/mob/npc/boss/minion`)은 **`--auto` 만 줘도 자동으로 `rotation=false`** 다(`ACTOR_KINDS` 판정). 비대화형 기본도 false | `--rotation false` 를 굳이 병기할 필요가 없다. 반대로 **`--rotation true` 를 억지로 켜면** 발 위치가 어긋나고 16방향 패킹이 20분 넘게 걸린다 |
+| `--vivid` | 기본 **9**(최대). `--auto` 도 9 | "5" 로 적힌 문서가 있으면 그 문서가 틀린 것이다 |
+| 행동별 생성 scale 기본값 | **전부 1.0**. 과거의 walk 0.9 / attack 0.8 일괄 축소 프리셋은 **폐기됐다** | 셀 확대는 RAM(iOS OOM)과 page 폭(8192 한계)을 키운다. 잘리는 행동만 auto-fit 이 낮춘다 |
+| 색 압축 | 프로젝트 루트에 `scripts/compress_image.py` 가 있으면 **자동으로 동작**한다(import → `uv run` 폴백). 판정은 로그에 **`⚠️ 압축 실패` 가 없는지**로 한다 | 이 스킬을 **단독 clone** 한 환경에는 그 파일이 없어 압축이 조용히 건너뛰어질 수 있다. 그때만 PNG 가 몇 배로 커진다 |
 
-번들 용량이 중요하면 laryen 의 `scripts/compress_image.py` 를 이 저장소에 두거나
-(`numpy`·`Pillow` 필요), 구운 뒤 따로 256색 양자화한다.
+### 프레임 수와 메모리는 한 몸이다
 
 | 항목 | 값(pc 기본) |
 |---|---|
 | 방향 | **16** |
-| 셀 | 128px 고정 |
+| 셀 | 128px |
 | 행동·프레임 | `idle 8` · `walk 12` · `attack 16` · `death 8` · `run 12` = 56프레임 |
 | 총 셀 | 56 × 16 = **896** |
-| 산출 | `assets/pc/<NAME>/<NAME>.png` + `.atlas`, `pubspec.yaml` 자동 등록 |
+| 산출 | `assets/pc/<NAME>/<NAME>.png` + `.atlas` (+ `--output` 미지정 시 `pubspec.yaml` 자동 등록) |
 
 프레임 수를 바꾸려면 `--idle 8 --walk 12 --attack 16 --death 8 --run 12` 처럼 개별 지정한다.
 **애니메이션 원본 길이는 idle 180 · walk 31 · run 16 · attack 38 · death 72 프레임**(실측)
-이므로, 위 기본값은 그 구간을 균등 샘플링한 것이다.
+이므로, 기본값은 그 구간을 균등 샘플링한 것이다.
 
-옵션·발 정렬·색 압축·잘림 검사는 texture-packer 스킬이 소유한다. **거기 문서를 먼저 읽을 것.**
+🛑 **프레임을 늘리면 부드러워지지만 RAM 이 그대로 늘어난다.** 게임의 메모리 공식은
+**`RAM ≈ 원본 PNG 가로 × 세로 × 4`** 이고, 프레임 수는 page 픽셀을 직접 키운다.
+**색 압축(256색)은 디스크·번들만 줄이고 RAM 은 1바이트도 줄이지 못한다** — 둘을 혼동하면
+"압축했으니 괜찮다" 며 OOM 으로 되돌아간다. 근거 없이 프레임을 늘리지 말 것.
 
 ## ⑨ 아틀라스 검증 (생략 금지)
 
@@ -575,9 +655,12 @@ python3 .claude/skills/texture-packer/scripts/sheet.py \
    --scale-attack 0.85 --scale-run 0.9
 ```
 
+⚠️ **이 제안을 `--auto` 와 함께 주면 무시된다**(위 옵션표). `--auto` 없이 `--scale-*` 만
+주거나, `--auto` 에 맡겨 auto-fit 이 수렴할 때까지 두거나 **둘 중 하나**를 고른다.
+
 ⚠️ **`verify_cells.py --atlas` 로 판정하지 말 것.** packed 아틀라스는 trim 후라 원본
-잘림이 보이지 않아 정상 자산도 전부 후보로 찍힌다(스크립트 주석의 실측 경고). 다시 검사할
-일이 있으면 **낱장 프레임 폴더**로 돌린다:
+잘림이 보이지 않아 정상 자산도 전부 후보로 찍힌다. **자동 게이트는 `--frames` 모드뿐**이다
+(종료 코드 0=정상 / 2=잘림 / 1=오류):
 
 ```bash
 python3 .claude/skills/texture-packer/scripts/verify_cells.py --frames outputs/<NAME>/frames
@@ -586,54 +669,122 @@ python3 .claude/skills/texture-packer/scripts/verify_cells.py --frames outputs/<
 그리고 `assets/pc/<NAME>/<NAME>.png` 을 **Read 로 열어** 확인한다 — 여기부터는 자동화할
 수 없다:
 
-- 5행동이 모두 **다른 포즈**인가 (전부 같으면 애니메이션이 안 붙은 것 → ⑥ 재실행)
+- 5행동이 모두 **다른 포즈**인가 (전부 같으면 애니메이션이 안 붙은 것 → ⑥⑦ 재실행)
 - 16방향이 실제로 돌아가는가
 - 팔다리가 뒤틀리지 않았는가 (뒤틀렸으면 ④ 의 마커 위치 → 재리깅)
-- 발 높이가 행동별로 튀지 않는가 (`align_feet` 가 맞추지만 확인은 필요)
+- 색이 살아 있는가 (회색·무채색이면 텍스처 폴더 누락 → 경계 계약 (1))
+- 발 높이가 행동별로 튀지 않는가 (`align_feet` 가 셀의 **0.85** 지점에 발을 고정한다)
+
+🛑 **정지 이미지만으로는 방향 전환과 발 튐을 못 잡는다.** 움직임을 반드시 한 번 본다 —
+같은 저장소에 스프라이트 뷰어가 있으면 그것으로, 없으면 앱을 **재빌드**해서(아틀라스 교체는
+hot reload 로 안 잡힌다) 확인한다.
+
+## ✅ Phase B 완료 조건
+
+1. **진입 검사 통과** — 경계 계약 (1)(2)(3) 을 확인하고 시작했다
+2. 렌더 로그에 `애니 소스 : 캐릭터 내장(built-in)` + `####ANIM <행동> ← '<액션>'` **5줄**,
+   `####WARN … 정적` **0줄**
+3. `verify_cells --frames` 종료 코드 0 (또는 auto-fit 수렴 로그로 잘림 0)
+4. 압축 로그에 `⚠️ 압축 실패` 없음
+5. 산출 위치와 `pubspec.yaml` 등록 여부가 의도와 일치한다
+6. 낱장 프레임 몽타주를 **눈으로** 확인했다(위 5항목)
+7. **움직임을 봤다** — 뷰어 또는 앱 재빌드 후 로드
+8. 🛑 여기까지 통과해도 **게임 화면에 새 캐릭터로 등장하는 것은 별개**다 → 다음 절
+
+---
+
+# 게임에 실제로 보이게 하려면 — 노출은 4층이다
+
+🛑 **아틀라스를 구웠다고 게임에 새 캐릭터가 나타나지 않는다.** 이것이 이 파이프라인에서
+가장 오해가 잦은 지점이고, **"안 보인다" 를 정상으로 넘기면 진짜 실패까지 묻힌다.**
+
+**안 보이면 순서를 지켜 판정한다 — 먼저 굽는 쪽부터 의심한다:**
+
+1. **굽는 쪽 게이트(⑤⑥⑦⑨)가 전부 통과했는가?** 하나라도 실패면 그것이 원인이다
+   (본 이름 어긋남 → 정적 프레임 / 텍스처 누락 → 회색 / 잘림).
+2. 게이트가 다 통과했다면, **아래 4층 중 연결되지 않은 층**이 원인이다:
+
+| 층 | 폴더 이름만으로 되는가 | 확인할 곳(라리엔 기준) |
+|---|---|---|
+| ① 월드 아틀라스 로드 | ✅ **된다** — 번들 매니페스트를 훑어 폴더명으로 연다 | `actor_animation_set.dart` `availablePcKinds()` |
+| ② 번들 등록 | ❌ `pubspec.yaml`(또는 원격 자산 목록)에 들어가고 **앱 재빌드** 필요 | `pubspec.yaml` 의 `AUTO(sheet.py packed actors)` 블록 |
+| ③ 캐릭터 **미리보기**(생성·목록 화면) | ❌ **아니다** — `assets/pc/<gender>/<gender>.atlas` 로 **`male`/`female` 고정** | `character_preview_atlas.dart` |
+| ④ 다른 플레이어에게 보이는 **외형** | ❌ **아니다** — 서버가 `외형코드 = 세트번호×2 + 성별` 로 만들고 클라가 번호표로 되돌린다 | 서버 `equip.go` `effectiveAppearance()` · 클라 `kindForAppearanceCode()` |
+
+즉 **①②만 하면 내 화면의 월드에는 뜨지만, 캐릭터 만들기 화면과 남의 화면에는 안 뜬다.**
+③④ 는 코드·서버 매핑을 추가해야 하며 **이 스킬의 범위 밖**이다.
+
+---
+
+# 3D 모델을 그대로 쓰기 (Phase A 만 필요한 경우)
+
+**Phase A 의 `<NAME>.blend` 는 다음 용도로 그대로 쓸 수 있다:**
+
+| 용도 | 쓰는 파일 | 비고 |
+|---|---|---|
+| **Blender 후속 편집** — 무기 손 장착, 홀로그램 재질, 밝기·색 보정, 스크린샷 | `<NAME>.blend` | 관련 스킬들이 `.blend`/`.fbx` 를 그대로 입력으로 받는다 |
+| **재렌더 원본** — 프레임 수·scale·kind 를 바꿔 아틀라스를 다시 굽기 | `<NAME>.blend` | 이것을 지우면 ⑦ 부터 다시 |
+| **재리깅 원본** | `<NAME>_raw.fbx` + `<NAME>_rig.blend` | Tripo 크레딧을 다시 쓰지 않는다 |
+
+🛑 **외부 3D 엔진(Unity/Unreal 등)에 납품하는 baked GLB/FBX 는 Phase A 의 계약물이 아니다.**
+별도 export + 재임포트 검증이 필요하고, **rest pose 가 보존되는지 아직 실측되지 않았다** —
+FBX 왕복에서 rest 가 무너지는 것은 실측으로 확인됐고(⑦), glTF/GLB 는 시도 기록이 없다.
+필요해지면 **⑦ 의 `.blend` 를 입력으로 하는 새 절차**를 만들고 "실험" 으로 표기해 검증부터 한다.
+
+🛑 **아래 레거시 GLB 스크립트를 여기에 끌어다 쓰지 말 것** — Tripo 오토리깅 41본
+(`Hip`/`L_Upperarm`) 전제라 ARP 의 `mixamorig:*` 65본에는 매핑이 통째로 어긋난다.
+
+---
 
 ## 산출물
 
 ```
 game-assets/characters/pc/<중간>/<NAME>/        # <중간> 은 분류용 — sheet.py 는 이름을 안 본다
 ├── <NAME>_raw.fbx      # ③ Tripo 원본(리깅 전) — 지우지 않는다
-├── <NAME>_raw.fbm/     # 텍스처
-├── <NAME>.fbx          # ⑤ ARP 리깅 + Mixamo 본 이름
-├── <NAME>.blend        # ⑦ rest pose 보정 + 액션 5종 ← **sheet.py 의 입력**
+├── <NAME>_raw.fbm/     # 텍스처 — 🛑 Phase B 에 반드시 동반돼야 한다
+├── <NAME>.fbx          # ⑤ ARP 리깅 + Mixamo 본 이름 (리그만·애니 없음)
+├── <NAME>.blend        # ⑦ rest pose 보정 + 액션 5종 ← **Phase A 계약물 · Phase B 입력**
 └── <NAME>_rig.blend    # ARP 리그 원본(컨트롤러 포함) — 재리깅용으로 반드시 남긴다
 
 assets/pc/<NAME>/
-├── <NAME>.png          # packed atlas
+├── <NAME>.png          # ⑧ packed atlas
 └── <NAME>.atlas        # flame_texturepacker 메타 (+ laryen.actionScale.* 헤더)
 ```
 
-**`<NAME>` 이 캐릭터 이름이고, 그대로 선택 화면에 보인다**〔원저자 지시 2026-07-30〕.
-성별 구분은 없다 — 캐릭터마다 폴더를 하나 만든다(`colonist`·`denis`·`maria`).
-
-⚠️ **로더는 전환 중이다.** 현재 코드는 아직
-[terraform_game.dart:98-106](../../../lib/engine/terraform_game.dart) 이 `PcGender.values`
-(`male`·`female`)만 순회하고 [pc_atlas.dart:94-107](../../../lib/engine/actor/pc_atlas.dart)
-이 `assets/pc/<gender>/<gender>.atlas` 를 연다. 폴더 이름을 그대로 보여주고 고르게 하는
-작업이 **다른 팀에서 진행 중**이라, 그 전까지 새 이름 아틀라스는 번들에만 들어가고 화면에는
-안 나올 수 있다. **이 스킬은 굽는 데까지 책임지며, 이름 규칙은 위가 정본이다.**
-
 런타임 쪽 규약(이미 구현돼 있다 — 이 스킬이 맞춰야 하는 계약):
 
-| 무엇 | 값 | 어디 |
-|---|---|---|
-| region 이름 | `<action>_<DIR16>` (예: `walk_ESE`) | `pc_atlas.dart:7` |
-| 행동 | `idle` `walk` `run` `attack` `death` | `pc_atlas.dart:82-88` |
-| 행동별 배율 | `.atlas` 헤더의 `laryen.actionScale.<action>` 을 `1/scale` 로 되돌림 | `pc_atlas.dart:19-23` |
-| trim 복원 | `useOriginalSize: true` — 없으면 방향마다 발 위치가 떤다 | `pc_atlas.dart:106` |
+| 무엇 | 값 |
+|---|---|
+| region 이름 | `<action>_<DIR16>` (예: `walk_ESE`). 8방향 kind 는 짝수 라벨만 |
+| 행동 | `idle` `walk` `run` `attack` `death` (`hit` 는 굽지 않고 런타임이 idle 로 폴백) |
+| 행동별 배율 | `.atlas` 헤더의 `laryen.actionScale.<action>` 을 `1/scale` 로 되돌림 |
+| 표시 크기 | `.atlas` 헤더의 `laryen.displaySize`(boss 256 · minion 64, 기본 128 은 생략) |
+| trim 복원 | `useOriginalSize: true` — 없으면 방향마다 발 위치가 떤다 |
+
+구현 위치는 프로젝트마다 다르다(라리엔 기준 `lib/features/game/render/actor_animation_set.dart`).
+**이 스킬은 독립 저장소이므로 특정 프로젝트의 파일 경로를 단정하지 않는다** — 실제 파일을
+찾아서 확인할 것.
+
+## 스크립트의 SSOT
+
+**이 스킬의 `scripts/` 가 원본이다.** 같은 스크립트가 다른 스킬(예: `actor`)에도 복사돼
+있으면 **그쪽이 사본**이고, 고칠 때는 여기를 고친 뒤 사본을 맞춘다. 사본을 먼저 고치면
+조용히 갈라진다(실측: 5개 파일이 바이트 단위로 같았다).
+
+⚠️ **이 스킬은 독립 저장소(submodule)로 배포된다.** 그래서 상위 프로젝트의 경로
+(`.claude/skills/actor/scripts/…` 등)를 **필수 의존으로 삼지 않는다** — 있으면 쓰고
+없으면 대체 수단을 안내하는 식으로만 참조한다(②-V 가 그 예다).
 
 ## 사용자에게 반드시 알릴 것
 
 - **④ 는 GUI 작업이라 자동으로 끝나지 않는다.** 마커 확인과 웨이트 확인은 사람이 본다.
   MCP 로 자동화하더라도 **마커 위치와 최종 아틀라스는 반드시 이미지로 보여준다**
+- **⑤ 부터는 전부 명령 한 줄이다** — 여기서 막혔다고 mixamo.com 으로 우회하지 말 것
 - **크레딧 소모** — 생성 55~65, Export 40 정도. **리깅 20 은 이제 들지 않는다**
-- 애니메이션 폴더에 **실제로 무엇이 있는지** — 없는 행동은 정적 프레임이 된다
-- 아틀라스 크기·프레임 수는 조정 가능하다(위 표) — 용량이 문제면 프레임을 줄인다
-- **⑦ 이 생기면서 산출물이 하나 늘었다** — `<NAME>.blend` 가 sheet.py 의 입력이다.
-  이걸 지우면 아틀라스를 다시 구울 때 리타게팅부터 해야 한다
+- 애니메이션 폴더에 **실제로 무엇이 있는지**(6개 중 5개 사용) — 없는 행동은 정적 프레임이 된다
+- **Phase A 만 필요한지 B 까지 필요한지 먼저 확인**한다. A 만이면 ⑦ 에서 끝난다
+- **`<NAME>.blend` 를 지우면** 아틀라스를 다시 구울 때 리타게팅부터 해야 한다
+- **아틀라스를 구웠다고 게임에 나오는 것이 아니다**(노출 4층). 어디까지 됐는지 명확히 보고할 것
 - 소요 시간 실측(우주복 캐릭터 1종) — 생성 4분 · 리깅 15분 · 리타게팅 2분 ·
   packing 1분 30초(auto-fit 재렌더 포함 시 3분)
 
@@ -641,45 +792,45 @@ assets/pc/<NAME>/
 
 | 증상 | 대처 |
 |---|---|
+| **Phase B 만 돌렸더니 5행동이 전부 같은 포즈** | `--animations built-in` 을 빠뜨렸다. 자동 탐색이 원본 Mixamo fbx 를 집은 것이다(경계 계약 (3)) |
+| **Phase B 만 돌렸더니 회색·무채색** | `.blend` 만 복사했다. `<NAME>_raw.fbm/` 텍스처 폴더가 같은 폴더에 있어야 한다(경계 계약 (1)) |
+| **⑤ 의 FBX 를 "3D 완성" 으로 넘겼는데 애니가 없다** | 정상이다. `arp_bake_anim=False` 라 리그만 들어 있다. 애니가 필요하면 ⑦ 까지 |
 | 버튼을 눌렀는데 아무 일도 안 일어남 | `evaluate_script` 대신 **`click` 도구에 uid**. 크레딧 차감으로 실행 확인 |
 | 다운로드가 오지 않음 | 8k 텍스처가 원인. `2k` 로 재시도(크레딧은 차감되므로 처음부터 2k) |
 | `Model count limit exceeded` | 계정 저장 한도 초과. 에셋 삭제는 되돌릴 수 없으므로 **반드시 사용자 확인 후** |
-| **"ARP 로는 Mixamo 리그를 못 만든다" 는 판단에 도달** | 🛑 **거의 항상 오진이다.** ④ 로그(`<NAME>_rig.blend.log.json`)에 `match_to_rig`·`bind_to_rig` 가 있으면 리깅은 성공한 것이고, 남은 것은 ⑤ 를 **실행하지 않은 것**뿐이다. `arp_export_mixamo.py` 를 돌려 볼 것 — mixamo.com 웹 업로드로 우회하기 전에 반드시(2026-08-03 실제 오진) |
-| ⑤ 를 GUI 로 해야 하는 줄 알고 멈춤 | ④ 만 GUI 다. ⑤ 는 `--background` 로 완주한다(⑤ 참조) |
+| **"ARP 로는 Mixamo 리그를 못 만든다" 는 판단에 도달** | 🛑 **거의 항상 오진이다.** ④ 로그(`<NAME>_rig.blend.log.json`)에 `match_to_rig`·`bind_to_rig` 가 있으면 리깅은 성공한 것이고, 남은 것은 ⑤ 를 **실행하지 않은 것**뿐이다 |
 | ARP `Go!` 에서 실패 | 스케일이 1 이 아니거나(Apply All Transforms) 메시가 여러 개로 쪼개져 있다 |
 | **`Click "Match to Rig" before binding/exporting`** | ④-3 을 건너뛴 것이다. reference bones 를 손본 뒤에도 **다시 눌러야** 한다 |
 | ARP 리그가 몸에 안 맞음 | 마커 위치 문제. 헬멧·백팩이 있으면 목·어깨를 손으로 옮긴다 |
-| `sheet.py` 가 `Mixamo rig 가 아닙니다` 로 즉시 종료 | rename 이 **통째로** 실패했다. `Rename Bones from File` 이 켜져 있었는지·경로가 맞는지 확인(`sheet.py:398-411`) |
-| `Mixamo 리그로 감지되지 않는다` | 위와 같은 원인. ARP 는 rename 파일이 없어도 **경고만 찍고 진행**한다 |
-| 검증에 `spine2 가 비었다` | Spine Count 가 3 이다. **4** 로 올린다(3 이면 ARP 가 `spine_03.x` 를 지운다) |
+| `sheet.py` 가 `Mixamo rig 가 아닙니다` 로 즉시 종료 | rename 이 **통째로** 실패했다. `Rename Bones from File` 이 켜져 있었는지·경로가 맞는지 확인 |
+| 검증에 `spine2 가 비었다`(21/22) | Spine Count 가 3 이다. `arp_export_mixamo.py` 가 `set_spine(4)`+`match_to_rig()` 로 자동 보정한다(`--no-spine-fix` 로 끌 수 있다) |
 | 검증에 `ARP 이름이 남아 있는 본 … c_thumb1.l` | 매핑표가 export 리그 이름과 어긋났다. 손가락 세 마디 전부 `c_` 다 |
 | 정점 그룹이 본과 이름이 다름 | rename 이 vgroup 에 반영되지 않았다. ARP GE Export 를 쓰지 않고 손으로 rename 했을 때 발생 |
-| 아틀라스의 5행동이 전부 같은 포즈 | 교집합이 임계 미달이다. ⑥ 을 돌려 `교집합 N < 32` 를 확인하고 매핑표를 고친다 |
-| **5행동이 움직이긴 하는데 팔이 전부 만세** | ⑦ 을 건너뛰었다. 본 이름이 다 맞아도 **ARP rest pose ≠ Mixamo rest pose** 라 그대로 붙이면 뒤틀린다. `retarget_to_arp_rig.py` 로 `.blend` 를 만들어 `--animations built-in` 으로 굽는다 |
-| 리타게팅했는데 **다리는 맞고 팔만 틀어짐** | 로컬 기준으로 보정한 것이다. **월드 기준**(`src_pose @ src_rest⁻¹ @ tgt_rest`)이어야 한다(⑦) |
+| **5행동이 움직이긴 하는데 팔이 전부 만세** | ⑦ 을 건너뛰었다. 본 이름이 다 맞아도 **ARP rest pose ≠ Mixamo rest pose** 다 |
+| 리타게팅했는데 **다리는 맞고 팔만 틀어짐** | 로컬 기준으로 보정한 것이다. **월드 기준**이어야 한다(⑦) |
 | 리타게팅 결과를 FBX 로 내보냈더니 **다시 T-포즈** | FBX 왕복에서 rest 가 달라진다. **`.blend` 로 넘긴다**(⑦) |
 | 액션을 할당했는데 **정적 T-포즈** | Blender 4.4+ 의 slotted action — `animation_data.action_slot` 을 안 잡았다 |
-| `id.go_detect.poll() failed` 가 계속 남 | 컨텍스트가 아니라 **active 오브젝트가 숨겨진 것**이다. `body_temp` 를 active 로 둔다(④-A 4번) |
-| `AI files are missing or not up to date` | `guess_markers`·`guess_fingers` 는 ARP AI 리소스가 필요하다. 마커는 `id.add_marker` 로 직접 놓고, 손가락은 `arp_smart_fingers_engine='LEGACY'` 로 우회(④-A 3번) |
-| `_append_arp` 가 `space_data … NoneType` 로 죽음 | MCP 실행 컨텍스트에 3D 뷰가 없다. `bpy.app.timers` 안에서 `temp_override(window, area, region)` 로 실행(④-A 5번) |
+| `id.go_detect.poll() failed` 가 계속 남 | 컨텍스트가 아니라 **active 오브젝트가 숨겨진 것**이다. `body_temp` 를 active 로(④-A 4번) |
+| `AI files are missing or not up to date` | `guess_markers`·`guess_fingers` 는 ARP AI 리소스가 필요하다. 마커는 `id.add_marker` 로, 손가락은 `arp_smart_fingers_engine='LEGACY'` 로 우회(④-A 3번) |
+| `_append_arp` 가 `space_data … NoneType` 로 죽음 | MCP 에 3D 뷰가 없다. `bpy.app.timers` 안에서 `temp_override` 로 실행(④-A 5번) |
 | 캐릭터가 100배 크기로 export 됨 | `arp_units_x100` 이 **기본 ON** 이다(⑤). 아틀라스만 보면 프레이밍이 bbox 기준이라 안 드러난다 |
-| 아틀라스 PNG 가 유난히 크다 | 색 압축이 건너뛰어졌다 — `scripts/compress_image.py` 부재(⑧ 참조) |
-| **스프라이트가 회색·무채색으로 나옴** | 텍스처 경로가 깨졌다. Tripo ZIP 을 `_raw` 로 rename 하면 blend 안 이미지가 옛 `tripo_convert_*.fbm` 을 가리킨다. `arp_export_mixamo.py` 가 자동 복구하지만, 로그의 `texture_paths … missing` 이 비어 있는지 확인할 것 |
-| 검증이 **21/22**(`spine2` 비었다) | `spine_count=3`. `arp_export_mixamo.py` 가 `set_spine(4)`+`match_to_rig()` 로 자동 보정한다(`--no-spine-fix` 로 끌 수 있다) |
+| **`--scale-attack 0.85` 를 줬는데 그대로다** | `--auto` 와 같이 준 것이다. `--auto` 는 auto-fit 을 켜 scale 을 1.0 으로 고정한다(⑧ 옵션표) |
+| 아틀라스 PNG 가 유난히 크다 | 색 압축이 건너뛰어졌다 — 프로젝트 루트에 `scripts/compress_image.py` 가 있는지, 로그에 `⚠️ 압축 실패` 가 없는지 확인 |
 | 팔이 뒤틀림 | 생성 시 T-Pose 토글 누락, 또는 Twist 본을 export 했다(`arp_export_twist` 는 **기본 ON**) |
-| 구운 아틀라스가 게임에 안 보임 | 로더가 아직 `PcGender`(`male`·`female`) 기반이다 — 폴더 이름 기반 전환이 다른 팀에서 진행 중. **굽는 쪽의 실패가 아니다**(③·산출물 참조) |
-| 프레임이 셀 밖으로 잘림 | `verify_cells.py` 가 제안하는 `--scale-<action>` 을 적용해 재굽기 |
+| 걷기가 뒤뚱거린다 | ② 에서 다리가 벌어진 채 생성됐다. 리깅 뒤에는 못 고친다 — **재생성**(②-V) |
+| **구운 아틀라스가 게임에 안 보임** | 먼저 ⑤⑥⑦⑨ 게이트를 확인하고, 다 통과했으면 [노출 4층](#게임에-실제로-보이게-하려면--노출은-4층이다) 중 미연결 층을 찾는다 |
+| 프레임이 셀 밖으로 잘림 | `verify_cells` 가 제안하는 `--scale-<action>` 을 **`--auto` 없이** 적용해 재굽기 |
 | background 에서 `arp_debug_mode` AttributeError | ARP 의 GUI 핸들러. **무해하다** — 그 아래 출력을 본다 |
 
-## 레거시 — GLB 경로
+## 레거시 — GLB 경로 (쓰지 않는다)
 
-**이 저장소에서는 쓰지 않는다.** `flutter_scene`(3D)을 폐기했기 때문이다(원저자 확정
-2026-07-30). 아래 스크립트는 3D 런타임을 쓰는 다른 프로젝트를 위해 남겨 둔 것이고,
-Tripo 오토 리깅 리그를 전제한다:
+**현 파이프라인에서는 쓰지 않는다.** 아래 스크립트는 **Tripo 오토 리깅 리그(41본)** 를
+전제하므로 ARP → `mixamorig:*` 흐름에 섞으면 매핑이 어긋난다. 3D 런타임을 쓰는 다른
+프로젝트를 위해 남겨 둔 것이다:
 
 | 스크립트 | 용도 |
 |---|---|
-| `scripts/retarget.py` | Mixamo → Tripo 본 리타게팅 → [references/retargeting.md](references/retargeting.md) |
+| `scripts/retarget.py` | Mixamo → **Tripo** 본 리타게팅 → [references/retargeting.md](references/retargeting.md) |
 | `scripts/postprocess_glb.py` | Decimate · root motion 제거 · 액션명 정규화 → GLB |
 | `scripts/inspect_glb.py` | GLB 10개 항목 검사(Blender 없이 순수 Python) |
 | `scripts/verify_render.py` | 동작별 프리뷰 PNG 렌더 |
@@ -689,3 +840,4 @@ Tripo 오토 리깅 리그를 전제한다:
 ⚠️ **새 흐름에 이것들을 섞지 말 것.** 특히 `postprocess_glb.py` 의 root motion 제거는
 sheet.py 가 Hips 를 추적해 스스로 처리하므로 불필요하고, 액션명 정규화는 sheet.py 의
 행동 인식과 규칙이 다르다.
+</content>
