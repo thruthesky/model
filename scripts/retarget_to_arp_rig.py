@@ -164,9 +164,19 @@ def main():
     char_path, anim_dir, out_blend = argv[0], argv[1], argv[2]
     os.makedirs(os.path.dirname(out_blend) or ".", exist_ok=True)
 
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    char_objs = import_fbx(char_path)
-    tgt = next(o for o in char_objs if o.type == "ARMATURE")
+    # 캐릭터는 FBX(⑤ ARP export) 또는 **.blend**(⑤-L close_legs.py 산출)로 온다.
+    # .blend 를 받는 이유 — 다리를 모으는 등 rest pose 를 고친 리그를 FBX 로 다시 내보내면
+    # 위 3번 경고대로 rest 가 달라져 교정이 풀릴 수 있다. 왕복 없이 그대로 받는다.
+    if os.path.splitext(char_path)[1].lower() == ".blend":
+        bpy.ops.wm.open_mainfile(filepath=char_path)
+        char_objs = list(bpy.data.objects)
+    else:
+        bpy.ops.wm.read_factory_settings(use_empty=True)
+        char_objs = import_fbx(char_path)
+    arms = [o for o in char_objs if o.type == "ARMATURE"]
+    if not arms:
+        raise SystemExit(f"캐릭터에 아마추어가 없다: {char_path}")
+    tgt = max(arms, key=lambda o: len(o.data.bones))
 
     made = []
     for name in ACTIONS:

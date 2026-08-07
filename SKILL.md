@@ -1,6 +1,6 @@
 ---
 name: model
-description: 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
+description: 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【다리 모으기】"다리 모아줘", "다리가 벌어졌어", "양다리·무릎·발 붙여줘", "다리 벌어진 것 고쳐줘", "close legs", "차렷 자세로", "팔자 다리 고쳐줘" — pc/mob 의 다리가 벌어져 있으면 재생성하지 않고 Blender 에서 rest pose 를 고쳐 모은다(⑤-L, 벌어진 모델은 지시 없이도 자동 적용). 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
 ---
 
 # Tripo3D 캐릭터 → Auto-Rig Pro(Mixamo 리그) → 16방향 스프라이트 아틀라스
@@ -14,7 +14,8 @@ description: 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Pha
 Phase A ── 3D 자산 ─────────────────────────┐
 ① 로그인 → ② 생성(T-Pose) → ③ 리깅 없이 다운로드
   → ④ ARP 리깅 (Smart → Match to Rig → Bind)
-  → ⑤ Mixamo 본 이름으로 export → ⑥ 리그 검증
+  → ⑤ Mixamo 본 이름으로 export
+  → ⑤-L 🦵 다리 벌어졌으면 **자동으로 모으기** → ⑥ 리그 검증
   → ⑦ rest pose 보정  ➜ **<NAME>.blend** (애니 5종 포함)
                                             │
              ← 3D 만 필요하면 여기서 끝 ───┘
@@ -200,10 +201,10 @@ feet touching`**, `symmetrical`, `game-ready`
 - 무릎이 곧게 펴져 있는가(굽혀 있으면 rest 가 어중간해져 같은 문제가 난다)
 - 발끝이 **정면(−Y)** 을 보는가 — 바깥으로 벌어진 발은 걸을 때 팔자로 보인다
 =======
-### 🛑 ②-V 다리가 벌어졌으면 **재생성한다** (완료 조건 0번)
+### ②-V 다리가 벌어졌는지 판정한다 (완료 조건 0번)
 
-다리·무릎·발이 벌어진 채로 리깅하면 걷기 모션에서 뒤뚱거리고, 그 결함은 **⑧ 에서 셀에
-맞춰 축소된 뒤에야** 눈에 띈다 — 그때는 생성부터 다시 해야 한다. **생성 직후에 판정한다.**
+다리·무릎·발이 벌어진 채로 두면 걷기 모션에서 뒤뚱거리고, 그 결함은 **⑧ 에서 셀에
+맞춰 축소된 뒤에야** 눈에 띈다. **생성 직후에 판정한다.**
 
 - 눈으로: 정면 렌더에서 두 발 사이가 붙어 있는가. 무릎이 벌어지지 않았는가.
 - 수치로: 같은 저장소에 `actor` 스킬이 있으면 그 판정 스크립트를 **경로로 호출**한다
@@ -213,6 +214,11 @@ feet touching`**, `symmetrical`, `game-ready`
   ls .claude/skills/actor/scripts/check_leg_gap.py && \
     blender --background --python .claude/skills/actor/scripts/check_leg_gap.py -- <모델.fbx>
   ```
+
+🛑 **벌어졌다고 바로 재생성하지 않는다**(2026-08-07 변경). 리깅이 끝난 뒤 **⑤-L 에서
+Blender 로 다리를 모은다** — 크레딧 55~65 와 4분을 아끼고, 다시 벌어져 나오는 재생성
+무한 반복도 없앤다. 재생성은 ⑤-L 로도 안 될 때의 **최후 수단**이다.
+(여기서 판정만 해 두고, 교정은 리그가 생긴 ⑤ 뒤에 한다 — 본이 있어야 다리를 돌릴 수 있다.)
 >>>>>>> ce2c03b2ca9dbd8fa24866f535170d1054cae5a0
 
 ### 폴리곤은 나중에 줄인다
@@ -527,6 +533,48 @@ game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx     ← ARP export 결과(�
                                 <NAME>_raw.fbx        ← ③ 의 원본. 지우지 않는다
 ```
 
+## ⑤-L 다리 모으기 — 벌어졌으면 **자동으로 모은다** 🦵
+
+🛑 **`pc`·`mob` 은 다리가 벌어져 있으면(발 폭의 50% 초과) 사용자가 시키지 않아도 여기서
+자동으로 모은다**〔원저자 지시 2026-08-07〕. 예전에는 "벌어졌으면 재생성" 이 유일한 답이라
+크레딧 55~65 와 4분을 다시 쓰고도 또 벌어져 나오기 일쑤였다.
+
+```bash
+# 자동 — 벌어졌을 때만 동작하고, 이미 모여 있으면 아무것도 하지 않는다(SKIP)
+blender --background --python .claude/skills/model/scripts/close_legs.py -- \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.legs.blend
+```
+
+| 언제 | 무엇을 한다 |
+|---|---|
+| 발 폭의 **50% 초과**(check_leg_gap 의 FAIL/WARN) | **자동으로 모은다** — 사용자 지시 불필요 |
+| 이미 모여 있다(50% 이하) | **손대지 않는다**(SKIP). 멀쩡한 자산을 건드리지 않기 위해서다 |
+| 사용자가 "다리 모아줘" 라고 **따로 요청** | `--force` 로 모여 있어도 목표까지 모은다 |
+| 더 바짝/느슨하게 | `--gap-ratio 0.15`(바짝) · `0.45`(느슨). 기본 0.30 |
+
+무엇을 하는가 — 좌우 다리마다 **엉덩이를 고정한 채 다리 전체를 안쪽으로 회전**하고
+(무릎은 다리에 매달려 함께 들어온다), **발은 회전 전 방향으로 복원**해 까치발을 막고,
+그 포즈를 **rest pose 로 굳힌다**. 회전으로 발이 지면을 뚫으면 전체를 z 이동해 다시 세운다.
+
+실측(2026-08-07 `suit_bot` 을 20° 벌린 테스트 케이스):
+
+| | 다리 간격 | 판정 |
+|---|---|---|
+| 교정 전 | 66.5 cm = 발 폭의 **132%** | 🛑 FAIL |
+| 교정 후 | 5.8 cm = 발 폭의 **34%** | ✅ PASS |
+
+🛑 **반드시 ⑦ 앞에서 돌린다.** ⑦ 은 캐릭터의 rest pose 를 기준으로 애니메이션을 다시
+굽는다. ⑦ **뒤에** 다리를 모으면 이미 구워진 액션과 rest 가 어긋나 전신이 뒤틀린다.
+
+🛑 **출력은 `.blend` 다(FBX 아님).** 교정한 리그를 FBX 로 다시 내보내면 rest 가 달라질
+위험이 있어 모은 의미가 사라진다(⑦ 머리말의 실측 경고와 같은 이유). **`retarget_to_arp_rig.py`
+는 `.blend` 캐릭터 입력을 받으므로**, ⑤-L 을 돌렸다면 ⑦ 에 `.fbx` 대신 이 `.blend` 를 넘긴다.
+
+⚠️ **결과가 여전히 50% 를 넘으면**(`[WARN]`) 다리가 아니라 **골반이 넓거나 발 자체가
+바깥으로 퍼진** 모델이다. `--gap-ratio` 를 낮춰 다시 시도하고, 그래도 안 되면 그때 ② 재생성으로
+간다. 다리를 완전 수직 이상으로 모으면 X 자가 되므로 스크립트가 상한을 둔다.
+
 ## ⑥ 리그 검증 (생략 금지)
 
 ```bash
@@ -594,6 +642,16 @@ blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.p
   game-assets/characters/pc/<중간>/<NAME>/<NAME>.blend
 ```
 
+🦵 **⑤-L 로 다리를 모았다면 첫 인자를 `<NAME>.legs.blend` 로 바꾼다** — 그러지 않으면
+교정 전 리그를 쓰게 되어 **다리가 다시 벌어진다**:
+
+```bash
+blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.py -- \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.legs.blend \
+  game-assets/animations/default \
+  game-assets/characters/pc/<중간>/<NAME>/<NAME>.blend
+```
+
 캐릭터 + 보정된 액션 5종을 담은 **`<NAME>.blend`** 가 나온다. 이 스크립트가 지키는 것 셋:
 
 | | 왜 |
@@ -606,12 +664,14 @@ blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.p
 
 여기까지 통과하면 **3D 자산이 완성된 것**이고, 2.5D 가 필요 없으면 **여기서 끝내도 된다.**
 
-0. 🛑 ②-V **다리·무릎·발이 모여 있다**(벌어졌으면 ② 재생성 — 뒤에서 고칠 수 없다)
+0. 🦵 **다리·무릎·발이 모여 있다** — `check_leg_gap.py` 가 **PASS**(발 폭의 50% 이하).
+   벌어졌으면 ⑤-L `close_legs.py` 로 모으고, 그래도 `[WARN]` 이면 그때 ② 재생성
 1. ④ `Match to Rig` 를 눌렀다 — `<NAME>_rig.blend.log.json` 에 `match_to_rig`·`bind_to_rig`
 2. ⑤ `arp_export_mixamo.py` 종료 0 — 로그에 `verify … leftover_count: 0`,
    `texture_paths … missing` 이 **빈 배열**
 3. ⑥ `verify_mixamo_rig.py` 종료 0 (22/22 역할 · 교집합 ≥ 32)
 4. ⑦ 리타게팅 로그에 `[OK] <행동>` 이 **5줄** → `<NAME>.blend` 생성
+   (⑤-L 을 돌렸다면 **입력이 `.legs.blend` 였는지** 확인 — `.fbx` 를 넣으면 다리가 도로 벌어진다)
 5. 계약 파일이 한 폴더에 다 있다 → 다음 절의 표
 6. (3D 로 바로 쓸 것이면) Blender 로 열어 액션 5종이 실제로 재생되는지 눈으로 확인
 
@@ -631,6 +691,7 @@ blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.p
 | **`<NAME>.blend`** (⑦) | ✅ | Phase B 입력 자체가 없다 |
 | **`<NAME>_raw.fbm/`** (텍스처 폴더) | ✅ | 🛑 `.blend` 는 텍스처를 **품고 있지 않고 외부 파일로 참조**한다(`retarget_to_arp_rig.py` 는 `save_as_mainfile` 만 하고 `pack_all` 을 하지 않는다). `.blend` 만 복사해 굽으면 **회색·무채색 스프라이트**가 나온다 — 분리 후 가장 흔할 오용이다 |
 | `<NAME>.fbx` (⑤) | ⭕ | 재보정·디버깅용 보관물 |
+| `<NAME>.legs.blend` (⑤-L) | ⭕ | 다리를 모은 경우에만 생긴다. ⑦ 의 입력이 **이것**이었어야 한다 |
 | `<NAME>_rig.blend` (④) | ⭕ | 재리깅 원본. 지우면 ④ GUI 부터 다시 |
 | `<NAME>_raw.fbx` (③) | ⭕ | 재리깅용 원본. 지우면 Tripo 크레딧 재소모 |
 
@@ -833,6 +894,7 @@ game-assets/characters/pc/<중간>/<NAME>/        # <중간> 은 분류용 — s
 ├── <NAME>_raw.fbx      # ③ Tripo 원본(리깅 전) — 지우지 않는다
 ├── <NAME>_raw.fbm/     # 텍스처 — 🛑 Phase B 에 반드시 동반돼야 한다
 ├── <NAME>.fbx          # ⑤ ARP 리깅 + Mixamo 본 이름 (리그만·애니 없음)
+├── <NAME>.legs.blend   # ⑤-L 다리를 모은 리그(벌어졌을 때만 생긴다) ← ⑦ 의 입력
 ├── <NAME>.blend        # ⑦ rest pose 보정 + 액션 5종 ← **Phase A 계약물 · Phase B 입력**
 └── <NAME>_rig.blend    # ARP 리그 원본(컨트롤러 포함) — 재리깅용으로 반드시 남긴다
 
@@ -870,7 +932,11 @@ assets/pc/<NAME>/
 - **④ 는 GUI 작업이라 자동으로 끝나지 않는다.** 마커 확인과 웨이트 확인은 사람이 본다.
   MCP 로 자동화하더라도 **마커 위치와 최종 아틀라스는 반드시 이미지로 보여준다**
 - **⑤ 부터는 전부 명령 한 줄이다** — 여기서 막혔다고 mixamo.com 으로 우회하지 말 것
-- **크레딧 소모** — 생성 55~65, Export 40 정도. **리깅 20 은 이제 들지 않는다**
+- 🦵 **다리가 벌어져 있었으면 ⑤-L 에서 자동으로 모았다는 사실을 알린다** — 교정 전후
+  간격(%)과 회전각을 함께. 사용자가 원래 자세를 원했을 수도 있으므로 되돌리는 법
+  (⑦ 에 `.fbx` 를 넘기면 원래대로)도 한 줄 덧붙인다
+- **크레딧 소모** — 생성 55~65, Export 40 정도. **리깅 20 은 이제 들지 않는다.**
+  다리가 벌어져도 이제 재생성하지 않으므로 그만큼 더 아낀다
 <<<<<<< HEAD
 - **② 에서 다리가 벌어져 나오면 재생성이 유일한 답이다**(크레딧 55~65 재소모).
   ③ 으로 넘어가기 전에 **미리보기를 보여 주고 재생성 여부를 먼저 묻는다** — 리깅까지
@@ -923,7 +989,11 @@ assets/pc/<NAME>/
 | 구운 아틀라스가 게임에 안 보임 | 로더가 아직 `PcGender`(`male`·`female`) 기반이다 — 폴더 이름 기반 전환이 다른 팀에서 진행 중. **굽는 쪽의 실패가 아니다**(③·산출물 참조) |
 | 프레임이 셀 밖으로 잘림 | `verify_cells.py` 가 제안하는 `--scale-<action>` 을 적용해 재굽기 |
 =======
-| 걷기가 뒤뚱거린다 | ② 에서 다리가 벌어진 채 생성됐다. 리깅 뒤에는 못 고친다 — **재생성**(②-V) |
+| **걷기가 뒤뚱거린다 · 다리가 벌어져 있다** | ⑤-L `close_legs.py` 로 모은다(자동). 재생성은 그것으로도 `[WARN]` 일 때의 **최후 수단**이다 |
+| **다리를 모았는데 결과물은 그대로 벌어져 있다** | ⑦ 에 `.fbx` 를 넣었다. ⑤-L 을 돌렸으면 **`.legs.blend`** 를 넘겨야 한다(⑦ 참조) |
+| **다리를 모았더니 까치발이 됐다** | 발 방향 복원이 안 먹은 것이다. `Foot`·`ToeBase` 본이 Mixamo 규격인지 확인할 것(⑥ 통과 후 실행) |
+| `close_legs.py` 가 `[SKIP] 이미 모여 있다` | 판정상 PASS 다. 그래도 더 모으려면 `--force`, 더 바짝은 `--gap-ratio 0.15` |
+| `close_legs.py` 가 `[WARN] 아직 …%` | 다리가 아니라 **골반이 넓거나 발이 바깥으로 퍼진** 모델이다. `--gap-ratio` 를 낮추고, 그래도 안 되면 ② 재생성 |
 | **구운 아틀라스가 게임에 안 보임** | 먼저 ⑤⑥⑦⑨ 게이트를 확인하고, 다 통과했으면 [노출 4층](#게임에-실제로-보이게-하려면--노출은-4층이다) 중 미연결 층을 찾는다 |
 | 프레임이 셀 밖으로 잘림 | `verify_cells` 가 제안하는 `--scale-<action>` 을 **`--auto` 없이** 적용해 재굽기 |
 >>>>>>> ce2c03b2ca9dbd8fa24866f535170d1054cae5a0
