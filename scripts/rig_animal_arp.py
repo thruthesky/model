@@ -18,7 +18,7 @@ poll 실패·AI 파일 누락)은 이 경로에 해당하지 않는다. backgrou
 구한다. 다리 개수·좌우 배분은 인자로 받는다.
 
 사용:
-    blender --background --python rig_spider_arp.py -- <입력.fbx|.glb> <출력.blend> [--legs 8]
+    blender --background --python rig_animal_arp.py -- <입력.fbx|.glb> <출력.blend> [--legs 8]
 """
 import bpy
 import sys
@@ -31,7 +31,7 @@ from mathutils import Vector
 # ─────────────────────────────── 인자 ───────────────────────────────
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 if len(argv) < 2:
-    print("usage: rig_spider_arp.py -- <입력모델> <출력.blend> [--legs N] [--body-ratio R]")
+    print("usage: rig_animal_arp.py -- <입력모델> <출력.blend> [--legs N] [--body-ratio R]")
     sys.exit(1)
 
 SRC = os.path.abspath(argv[0])

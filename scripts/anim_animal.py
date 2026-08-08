@@ -12,7 +12,7 @@
 IK 로 따라오므로, 관절마다 각도를 지어내지 않아도 다리가 자연스럽게 접힌다.
 
 사용:
-    blender --background <리그.blend> --python anim_spider.py -- <출력.blend>
+    blender --background <리그.blend> --python anim_animal.py -- <출력.blend>
 """
 import bpy
 import sys
@@ -23,7 +23,7 @@ from mathutils import Vector, Matrix, Euler
 
 argv = sys.argv[sys.argv.index("--") + 1:] if "--" in sys.argv else []
 if not argv:
-    print("usage: blender --background <리그.blend> --python anim_spider.py -- <출력.blend>")
+    print("usage: blender --background <리그.blend> --python anim_animal.py -- <출력.blend>")
     sys.exit(1)
 DST = os.path.abspath(argv[0])
 
