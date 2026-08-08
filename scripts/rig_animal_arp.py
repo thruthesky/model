@@ -54,7 +54,16 @@ for i, a in enumerate(argv):
     elif a == "--foot-min" and i + 1 < len(argv):
         FOOT_MIN = int(argv[i + 1])
 
-LOG = {"src": SRC, "dst": DST, "legs_requested": LEGS, "steps": [], "errors": []}
+# FRONT_Y — 이 리그가 몸의 정면으로 삼는 Y 축 부호(-1 = −Y 가 앞). 아래 spine 배치가
+# 이 값으로 몸통 방향을 정하고, 같은 값을 리그 오브젝트에 기록해 anim_animal.py 가 읽는다.
+#
+# 🛑 상수를 두 파일에 각각 두고 손으로 맞추지 않는다 — 과거 rig(−Y)와 anim(+Y)이 어긋나
+# **몸이 향한 반대로 걷는** 결함이 있었다(거미는 방사대칭이라 안 보였을 뿐, 앞뒤가 분명한
+# 액터에서 그대로 드러난다). 리깅이 정하고 애니가 읽는 단방향이라 어긋날 수 없다.
+FRONT_Y = -1.0
+
+LOG = {"src": SRC, "dst": DST, "legs_requested": LEGS, "front_y": FRONT_Y,
+       "steps": [], "errors": []}
 
 
 def step(name, **kw):
@@ -410,13 +419,13 @@ rig.data.use_mirror_x = False
 
 placed, missing = [], []
 
-# 몸통 spine — 앞(−Y)이 정면이 되게 배치. 거미 몸통은 낮고 길다.
+# 몸통 spine — FRONT_Y 쪽이 정면이 되게 배치(head=뒤, tail=앞). 거미 몸통은 낮고 길다.
 body_top = max(v.z for v in verts if math.hypot(v.x, v.y) < rlim) if any(
     math.hypot(v.x, v.y) < rlim for v in verts) else H * 0.6
 body_z = body_top * 0.62
 for nm, head, tail in (
-    ("root_ref.x", Vector((0, 0.06 * R, body_z)), Vector((0, -0.02 * R, body_z))),
-    ("spine_01_ref.x", Vector((0, 0.06 * R, body_z)), Vector((0, -0.10 * R, body_z * 1.05))),
+    ("root_ref.x", Vector((0, -FRONT_Y * 0.06 * R, body_z)), Vector((0, FRONT_Y * 0.02 * R, body_z))),
+    ("spine_01_ref.x", Vector((0, -FRONT_Y * 0.06 * R, body_z)), Vector((0, FRONT_Y * 0.10 * R, body_z * 1.05))),
 ):
     b = eb.get(nm)
     if b:
@@ -498,6 +507,11 @@ step("verify_bind", vertex_groups=nvg, armature_modifier=has_arm_mod,
      deform_bones=sum(1 for b in rig.data.bones if b.use_deform))
 if not has_arm_mod or nvg == 0:
     fail("바인딩이 되지 않았습니다(armature modifier 또는 vertex group 없음)")
+
+# 정면축을 리그에 남긴다 — anim_animal.py 가 이것을 읽어 전진·앞다리 방향을 정한다.
+# 여기가 이 값의 유일한 출처다(§FRONT_Y 주석).
+rig["laryen_front_y"] = FRONT_Y
+step("front_axis", front_y=FRONT_Y)
 
 os.makedirs(os.path.dirname(DST), exist_ok=True)
 bpy.ops.wm.save_as_mainfile(filepath=DST)
