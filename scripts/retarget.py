@@ -51,8 +51,12 @@ BONE_MAP = {
 ROOT_SRC = "mixamorig:Hips"     # 유일하게 위치까지 옮기는 본
 ROOT_TGT = "Hip"
 
-# 이 순서대로 먼저 처리하고, 목록에 없는 fbx 는 이름순으로 뒤에 붙인다
-PREFERRED_ORDER = ["idle", "walk", "run", "attack", "hit", "death"]
+# 런타임 계약에 있는 파일만 이 순서대로 처리한다. 폴더에는 `tiling.fbx` 같은 작업용
+# 파일도 있으므로 임의의 나머지를 GLB에 넣지 않는다.
+PREFERRED_ORDER = [
+    "idle", "walk", "run", "slash",
+    "standing_gun_shooting", "walking_gun_shooting", "hit", "death",
+]
 
 
 def count_fcurves(action):
@@ -176,11 +180,9 @@ def retarget(src_arm, tgt_arm, action_name):
 
 
 def collect_animations(anim_dir):
-    """폴더의 모든 fbx 를 모으되 PREFERRED_ORDER 를 앞세운다."""
+    """폴더에서 런타임 계약에 명시된 FBX만 모은다."""
     names = [f[:-4] for f in os.listdir(anim_dir) if f.lower().endswith(".fbx")]
-    head = [n for n in PREFERRED_ORDER if n in names]
-    tail = sorted(n for n in names if n not in head)
-    return head + tail
+    return [n for n in PREFERRED_ORDER if n in names]
 
 
 def main():
@@ -238,16 +240,6 @@ def main():
         mesh_smooth_type="FACE",
     )
     print(f"[출력] {fbx_out}")
-
-    glb_out = os.path.join(out_dir, f"{out_name}.glb")
-    bpy.ops.export_scene.gltf(
-        filepath=glb_out,
-        export_format="GLB",
-        export_animation_mode="ACTIONS",
-        export_animations=True,
-        use_selection=True,
-    )
-    print(f"[출력] {glb_out}")
 
     print("\n=== 요약 ===")
     for name, f0, f1, n in results:

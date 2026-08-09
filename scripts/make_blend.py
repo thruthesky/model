@@ -11,7 +11,10 @@ import bpy
 import sys
 from mathutils import Vector
 
-PREFERRED_ORDER = ["idle", "walk", "run", "attack", "hit", "death"]
+PREFERRED_ORDER = [
+    "idle", "walk", "run", "slash",
+    "standing_gun_shooting", "walking_gun_shooting", "hit", "death",
+]
 GAP = 10          # 동작 사이 여유 프레임
 FPS = 30          # Mixamo 기본 프레임레이트
 

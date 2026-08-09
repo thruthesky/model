@@ -1,5 +1,5 @@
 """Mixamo 애니메이션을 ARP 로 리깅한 캐릭터의 rest pose 에 맞춰 다시 굽고,
-캐릭터 + 액션 5종을 담은 **.blend** 를 만든다. sheet.py 에 그 .blend 를
+캐릭터 + 런타임 액션을 담은 **.blend** 를 만든다. sheet.py 에 그 .blend 를
 `--animations built-in` 으로 주면 그대로 렌더된다.
 
 왜 이 단계가 필요한가 (실측 2026-07-30):
@@ -29,7 +29,10 @@ import os
 import sys
 from mathutils import Matrix
 
-ACTIONS = ["idle", "walk", "run", "attack", "death"]
+ACTIONS = [
+    "idle", "walk", "run", "slash",
+    "standing_gun_shooting", "walking_gun_shooting", "death",
+]
 
 
 def rotm(M):

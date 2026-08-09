@@ -15,7 +15,7 @@ ARP → Mixamo 경로의 산출물은 `retarget_to_arp_rig.py` 가 만든 **`.bl
 
 | 항목 | 값 | 왜 |
 |---|---|---|
-| 애니메이션 이름 | `idle`·`walk`·`run` (+`attack`·`death`) **접두사 없이** | `findAnimationByName` 은 부분 일치를 하지 않는다 |
+| 애니메이션 이름 | `idle`·`walk`·`run` + `slash`·사격 2종 (+`death`) **접두사 없이** | `findAnimationByName` 은 부분 일치를 하지 않는다 |
 | 본 이름 | `mixamorig:*` 52본 | ARP GE Export 의 rename 결과 |
 | 키 | **0.98m** | `WorldScale.pcModelHeightMeters` 가 **상수 하나**다 — 모델마다 다르면 배율이 통째로 틀어진다 |
 | 발 | 원점(min.z ≈ 0) | 지면에 세우는 기준 |

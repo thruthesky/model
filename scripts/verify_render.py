@@ -16,7 +16,9 @@ SHOTS = {
     "idle": (0.0, 0.5),
     "walk": (0.25, 0.75),
     "run": (0.25, 0.75),
-    "attack": (0.4, 0.7),
+    "slash": (0.4, 0.7),
+    "standing_gun_shooting": (0.25, 0.75),
+    "walking_gun_shooting": (0.25, 0.75),
     "hit": (0.3, 0.6),
     "death": (0.5, 1.0),
 }
@@ -66,7 +68,10 @@ def main():
     os.makedirs(out_dir, exist_ok=True)
 
     bpy.ops.wm.read_factory_settings(use_empty=True)
-    bpy.ops.import_scene.fbx(filepath=fbx_path)
+    if fbx_path.lower().endswith((".glb", ".gltf")):
+        bpy.ops.import_scene.gltf(filepath=fbx_path)
+    else:
+        bpy.ops.import_scene.fbx(filepath=fbx_path)
 
     arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
     meshes = [o for o in bpy.data.objects if o.type == "MESH"]

@@ -119,6 +119,27 @@ def normalize_action_names():
             action.name = short
 
 
+def push_actions_to_nla(arm):
+    """Blender 4.4+ 슬롯 액션을 glTF가 확실히 찾도록 NLA 트랙에 올린다."""
+    ad = arm.animation_data or arm.animation_data_create()
+    ad.action = None
+    for track in list(ad.nla_tracks):
+        ad.nla_tracks.remove(track)
+    pushed = []
+    for action in bpy.data.actions:
+        track = ad.nla_tracks.new()
+        track.name = action.name
+        start = int(action.frame_range[0])
+        strip = track.strips.new(action.name, start, action)
+        strip.name = action.name
+        if hasattr(strip, "action_slot") and getattr(strip, "action_slot", None) is None:
+            slots = getattr(strip, "action_suitable_slots", None)
+            if slots:
+                strip.action_slot = slots[0]
+        pushed.append(action.name)
+    print(f"[NLA] 액션 {len(pushed)}개를 트랙으로: {pushed}")
+
+
 def glb_animation_names(path):
     """내보낸 GLB 의 JSON 청크를 직접 읽어 애니메이션 이름을 확인한다.
 
@@ -163,13 +184,15 @@ def main():
     normalize_height(arm, meshes, target_height)
     strip_root_motion("Hip")
     normalize_action_names()
+    push_actions_to_nla(arm)
 
     os.makedirs(os.path.dirname(os.path.abspath(out_glb)), exist_ok=True)
     bpy.ops.object.select_all(action="SELECT")
     bpy.ops.export_scene.gltf(
         filepath=out_glb,
         export_format="GLB",
-        export_animation_mode="ACTIONS",
+        # Blender 5.1 슬롯 액션은 ACTIONS 모드에서 조용히 누락될 수 있다.
+        export_animation_mode="NLA_TRACKS",
         export_animations=True,
         export_skins=True,
         export_yup=True,

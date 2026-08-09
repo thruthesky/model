@@ -3,7 +3,7 @@ Auto-Rig Pro 로 리깅해 내보낸 캐릭터가 texture-packer 의 sheet.py �
 상태인지 검사한다.
 
 sheet.py 는 애니메이션을 붙일 수 있는지를 *본 이름으로* 판단하는데, 붙지 않아도
-예외를 내지 않는다 — "5행동이 전부 같은 T-포즈인 아틀라스" 가 조용히 나오고,
+예외를 내지 않는다 — "모든 행동이 같은 T-포즈인 아틀라스" 가 조용히 나오고,
 896장을 다 렌더한 뒤에야 눈으로 알 수 있다. 그 전에 여기서 잡는다.
 
 ⚠️ 판정 기준은 `_sheet_render.py` 의 것을 **그대로** 옮겼다. 두 가지가 다르다:
@@ -24,7 +24,7 @@ sheet.py 는 애니메이션을 붙일 수 있는지를 *본 이름으로* 판�
   blender --background --python verify_mixamo_rig.py -- <캐릭터파일> [애니메이션폴더]
 
   <캐릭터파일>     .fbx / .glb / .gltf / .blend
-  [애니메이션폴더] 지정하면 {idle,walk,run,attack,death} 를 실제로 열어
+  [애니메이션폴더] 지정하면 런타임 이동·slash·사격·death 파일을 실제로 열어
                    "리타게팅 없이 직접 적용되는가" 까지 확인한다.
 
 종료 코드: 0 = 통과, 1 = 실패(모든 FAIL 을 출력한 뒤 종료)
@@ -62,7 +62,10 @@ MIXAMO_ROLES = {
 MIN_ROLES = 8               # _sheet_render.py:321 — detect_rig 의 리그 *종류* 판정
 ANIM_COMMON_MIN = 8         # _sheet_render.py:451 — 교집합 하한
 ANIM_COMMON_RATIO = 0.5     # _sheet_render.py:451 — 애니 본 수 대비 비율
-ACTIONS = ["idle", "walk", "run", "attack", "death"]     # sheet.py 의 pc kind 5행동
+ACTIONS = [
+    "idle", "walk", "run", "slash",
+    "standing_gun_shooting", "walking_gun_shooting", "death",
+]
 
 _fails = []
 
