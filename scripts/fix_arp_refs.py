@@ -85,6 +85,14 @@ def main():
     leg_end = vec_arg(argv, "--leg-end", Vector((0.062, 0.010, 0.085)))
 
     bpy.ops.wm.open_mainfile(filepath=src)
+
+    # 🛑 `go_detect` 직후에 저장한 blend 는 **EDIT_ARMATURE 모드**로 열린다(실측
+    # 2026-08-10 · Blender 5.1). 그 상태에서는 아래 `object.select_all` 의 poll 이
+    # 실패해 **스크립트가 첫 연산자에서 죽는다** — 오류 메시지가 "context is
+    # incorrect" 뿐이라 원인이 파일 안에 있다는 것이 드러나지 않는다.
+    if bpy.context.mode != 'OBJECT':
+        bpy.ops.object.mode_set(mode='OBJECT')
+
     rig = bpy.data.objects['rig']
     mesh = [o for o in bpy.data.objects
             if o.type == 'MESH' and not o.name.startswith('cs_')][0]

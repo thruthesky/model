@@ -35,6 +35,12 @@ def import_any(path):
         bpy.ops.import_scene.fbx(filepath=path)
     elif low.endswith((".glb", ".gltf")):
         bpy.ops.import_scene.gltf(filepath=path)
+    elif low.endswith(".blend"):
+        # 🛑 `prep_for_rigging.py` 의 산출물을 그대로 잰다. 원본 FBX 를 재면
+        # **키 정규화 전 좌표**가 나오는데(실측: 0.978 → 1.750, 배율 1.79),
+        # ARP 마커는 prep 된 리깅 대상 위에 놓이므로 그 좌표여야 맞는다.
+        bpy.ops.wm.open_mainfile(filepath=path)
+        return list(bpy.data.objects)
     else:
         raise SystemExit(f"지원하지 않는 형식: {path}")
     return [o for o in bpy.data.objects if o not in before]
