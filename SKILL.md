@@ -84,6 +84,7 @@ description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 A
 |---|---|---|
 | 사람·인간형 로봇·2족 직립 NPC | **이 문서** ①~⑨ | 16방향 · 5행동(idle walk run attack death) · 128 |
 | **거미 · 지네 · 고질라 · 네발 짐승 등 동물형** | **[non-humanoid.md](references/non-humanoid.md)** | **8방향 · 4행동(idle walk attack death) · 128 · `outputs/` 저장** |
+| **드론 · 호버 유닛 등 비행체**(다리 없음) | **[non-humanoid.md §비행체](references/non-humanoid.md)** | 8방향 · 4행동 · 128. 🛑 동물형 경로도 **탈 수 없다** — 발끝 클러스터링(지면 접지)과 삼각보행(IK 발 4개)이 둘 다 성립하지 않아 `rig_drone_arp.py`·`anim_drone.py` 전용 |
 
 동물형이 이 문서를 타면 **두 곳에서 반드시 막힌다**(우회로 없음):
 
