@@ -823,11 +823,16 @@ ARP 리그에는 쓸 수 없다 — 팔이 만세로 나온다(⑦ 참조).
 |---|---|
 | 방향 | **16** |
 | 셀 | 128px |
-| 행동·프레임 | `idle 8` · `walk 12` · `attack 16` · `death 8` · `run 12` = 56프레임 |
-| 총 셀 | 56 × 16 = **896** |
+| 행동·프레임 | **pc** `idle 8` · `walk 12` · `attack 16` · `death 8` · `run 12` = 56프레임<br>**몬스터(mob·boss·minion)** `idle 8` · `walk 10` · `attack 10` · `death 6` = **34프레임**(2026-08-12 `MONSTER_FRAMES`) |
+| 총 셀 | pc 56 × 16 = **896** · mob 34 × 16 = **544** · boss/minion 34 × 8 = **272** |
 | 산출 | `assets/pc/<NAME>/<NAME>.png` + `.atlas` (+ `--output` 미지정 시 `pubspec.yaml` 자동 등록) |
 
-프레임 수를 바꾸려면 `--idle 8 --walk 12 --attack 16 --death 8 --run 12` 처럼 개별 지정한다.
+> 🛑 **몬스터는 pc 보다 적게 굽는다** — atlas RAM ≈ page W×H×4 라 셀 수 감축이 그대로 RAM 감축이고
+> (65종 실측 1112→850MB, −23.6%), **화질 손실은 0**. 재생 속도는 클라가 흡수한다
+> (`_atlasActions` = 한 바퀴 목표 시간). SSOT 는 `sheet.py`·`sheet-win.py` 의 `MONSTER_FRAMES`
+> — **두 파일을 반드시 함께** 고친다.
+
+프레임 수를 바꾸려면 `--idle 8 --walk 10 --attack 10 --death 6` 처럼 개별 지정한다.
 **애니메이션 원본 길이는 idle 180 · walk 31 · run 16 · attack 38 · death 72 프레임**(실측)
 이므로, 기본값은 그 구간을 균등 샘플링한 것이다.
 
