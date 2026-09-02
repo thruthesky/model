@@ -400,6 +400,33 @@ def main() -> int:
             if span < 0.2:
                 fail(f"애니 '{name}' 이 {span:.3f}초뿐이다 — 빈 껍데기다. "
                      f"Mixamo 원본이 제대로 임포트됐는지 확인한다")
+        # 🛑 애니 translation 키가 캐릭터 크기와 같은 단위인지 본다.
+        #
+        # rest bbox 만 보면 **애니를 켠 순간 폭발하는** 모델을 통과시킨다.
+        # 실측(2026-09-02 male): rest 1.8m 로 전부 OK 였는데 재생하면 21.5m 가
+        # 됐다 — Mixamo 애니가 cm 단위(Hips 105)인데 리그는 m(0.89)여서다.
+        height = (hi[1] - lo[1]) if not math.isinf(lo[0]) else 0.0
+        if height > 0:
+            worst = 0.0
+            worst_name = ""
+            for a in anims:
+                for ch in a.get("channels", []):
+                    if ch.get("target", {}).get("path") != "translation":
+                        continue
+                    acc_out = g["accessors"][a["samplers"][ch["sampler"]]["output"]]
+                    if not acc_out.get("max"):
+                        continue
+                    m = max(abs(v) for v in acc_out["max"] + acc_out.get("min", []))
+                    if m > worst:
+                        worst, worst_name = m, a.get("name", "")
+            # 사람 애니의 이동 키는 키를 크게 넘지 않는다. 3배는 명백한 단위 불일치다.
+            if worst > height * 3.0:
+                fail(f"애니 translation 키가 {worst:.1f} 로 키({height:.2f} m)의 "
+                     f"{worst / height:.0f}배다 — '{worst_name}' 의 단위가 어긋났다. "
+                     f"재생하면 캐릭터가 그만큼 폭발한다(소스 cm ↔ 리그 m)")
+            else:
+                ok(f"애니 translation 최대 {worst:.2f} — 키({height:.2f} m) 대비 정상")
+
         missing = [w for w in want if w not in names]
         if missing:
             fail(f"규격 애니가 없다: {', '.join(missing)} "

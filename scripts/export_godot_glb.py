@@ -130,6 +130,46 @@ def resize_textures(limit: int) -> list[str]:
     return changed
 
 
+def rig_scale_ref(arm) -> float:
+    """리그의 크기 기준값 — Hips rest head 까지의 거리.
+
+    두 리그의 단위계를 비교하는 데 쓴다. Mixamo 원본은 **cm**(Hips 105.2),
+    정규화된 우리 리그는 **m**(Hips 0.894) 라 그대로 섞으면 117배 어긋난다.
+    """
+    for name in ("mixamorig:Hips", "Hips"):
+        b = arm.data.bones.get(name)
+        if b:
+            return max(b.head_local.length, 1e-6)
+    # Hips 가 없으면 가장 먼 본까지의 거리로 대신한다.
+    return max((b.head_local.length for b in arm.data.bones), default=1.0)
+
+
+def scale_action_locations(act, factor: float) -> int:
+    """한 액션의 location F-curve 를 factor 배로 스케일한다.
+
+    🛑 회전 트랙은 건드리지 않는다 — 단위가 없는 값이라 그대로 맞다.
+    Mixamo 에서 location 키를 갖는 본은 사실상 Hips 뿐이다.
+    """
+    curves = []
+    try:
+        for layer in act.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    curves.extend(bag.fcurves)
+    except AttributeError:
+        curves = list(getattr(act, "fcurves", []))
+    touched = 0
+    for fc in curves:
+        if not fc.data_path.endswith("location"):
+            continue
+        for kp in fc.keyframe_points:
+            kp.co[1] *= factor
+            kp.handle_left[1] *= factor
+            kp.handle_right[1] *= factor
+        touched += 1
+    return touched
+
+
 def import_animations(folder: Path, arm) -> list[str]:
     """폴더의 .fbx 를 액션으로 임포트한다. 파일 이름이 액션 이름이 된다.
 
@@ -146,6 +186,7 @@ def import_animations(folder: Path, arm) -> list[str]:
         return imported
 
     our_bones = {b.name for b in arm.data.bones}
+    our_ref = rig_scale_ref(arm)
 
     for fbx in fbx_files:
         name = fbx.stem.lower()
@@ -159,9 +200,28 @@ def import_animations(folder: Path, arm) -> list[str]:
         new_objs = [o for o in bpy.data.objects if o not in before_objs]
         new_acts = [a for a in bpy.data.actions if a not in before_acts]
 
+        # 🛑 단위 보정 — 이것을 빼면 캐릭터가 애니 재생 시 폭발한다.
+        #
+        # Mixamo 애니 FBX 는 **cm 단위**(Hips rest 105.2)이고, 정규화된 우리
+        # 리그는 **m 단위**(Hips 0.894)다. 액션의 location 키는 본 로컬 값이라
+        # 아마추어 scale 과 무관하게 그대로 남으므로, 보정 없이 붙이면 Hips 가
+        # "148 cm" 가 아니라 "148 m" 위로 올라간다.
+        #
+        # 실측(2026-09-02 male): rest 는 1.8m 로 정상인데 애니를 적용하면
+        # **21.5m** 로 12배 폭발했다. rest bbox 만 보는 검증은 이것을 통과시킨다.
+        src_ratio = 1.0
+        for src in new_objs:
+            if src.type == "ARMATURE":
+                src_ratio = our_ref / rig_scale_ref(src)
+                break
+
         if new_acts:
             act = new_acts[0]
             act.name = name
+            if abs(src_ratio - 1.0) > 0.01:
+                n = scale_action_locations(act, src_ratio)
+                log(f"  {name}: location 키 {n}개를 {src_ratio:.6f} 배로 단위 보정 "
+                    f"(소스 cm → 우리 m)")
             # 액션이 우리 리그의 본을 실제로 건드리는지 확인한다.
             act.use_fake_user = True
             imported.append(name)
