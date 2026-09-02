@@ -26,7 +26,9 @@ Tripo3D 는 **Y-up · 1.0 단위 · 원점이 제각각**인 메시를 준다. M
 
 ## 무엇을 보장하는가 (Godot 규약)
 
-    1. Blender 월드에서 **Z-up · 정면 −Y**       → Godot 이 Y-up · 정면 −Z 로 변환
+    1. Blender 월드에서 **Z-up · 정면 +Y**       → glTF 가 -Z 로 바꿔 Godot 정면과 일치
+       🛑 **-Y 가 아니다** — assets-3d.md 의 '-Y forward' 는 FBX 익스포터 설정이고,
+          glTF 익스포터에는 forward 옵션이 없어 Blender +Y 가 그대로 -Z 가 된다
     2. **키 1.8 m**                              → --height 로 조정
     3. **발바닥이 원점**(bbox Z_min = 0), 좌우·앞뒤 중심이 원점
     4. **loc 0 · rot 0 · scale 1** — 전부 데이터에 구움 → glTF 루트에 변환이 실리지 않는다
@@ -100,6 +102,13 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ap.add_argument("--kind", default="human",
                     choices=("human", "animal", "drone", "prop"),
                     help="형태. prop 은 키 정규화를 건너뛰고 원점만 맞춘다")
+    ap.add_argument("--scale", type=float, default=1.0,
+                    help="최종 크기 배율. --height 에 곱한다(1.2 면 1.8×1.2=2.16m). 기본 1.0")
+    ap.add_argument("--forward", default="auto",
+                    choices=("auto", "+Y", "-Y", "skip"),
+                    help="Blender 기준 정면 **확인용**(돌리지 않는다). 기본 auto. "
+                         "🛑 ARP·Mixamo 는 -Y 정면을 전제하므로 리깅 전에는 그대로 둔다. "
+                         "Godot 용 180° 회전은 export_godot_glb.py 가 한다")
     ap.add_argument("--triangles", type=int, default=DEFAULT_TRIANGLES,
                     help=f"삼각형 예산. 권장 사다리 {TRIANGLE_LADDER}. "
                          f"기본 {DEFAULT_TRIANGLES}. 0 이면 줄이지 않는다")
@@ -244,6 +253,60 @@ def reattach_actions(saved: list) -> None:
                 o.animation_data.action_slot = slot
             except (AttributeError, TypeError):
                 pass
+
+
+def detect_forward(meshes: list) -> str:
+    """발가락 방향으로 Blender 기준 정면을 판별한다 — '+Y' 또는 '-Y'.
+
+    사람·인간형은 **발뒤꿈치보다 발가락이 길다.** 발 영역(하위 12%)의 y 분포에서
+    중앙값 기준으로 더 멀리 뻗은 쪽이 정면이다.
+    """
+    lo, hi = world_bbox(meshes)
+    h = hi.z - lo.z
+    pts = []
+    for o in meshes:
+        mw = o.matrix_world
+        for v in o.data.vertices:
+            w = mw @ v.co
+            if w.z < lo.z + h * 0.12:
+                pts.append(w.y)
+    if len(pts) < 8:
+        return "-Y"
+    pts.sort()
+    med = pts[len(pts) // 2]
+    front = med - pts[0]      # -Y 쪽으로 뻗은 길이
+    back = pts[-1] - med      # +Y 쪽으로 뻗은 길이
+    return "-Y" if front > back else "+Y"
+
+
+def face_plus_y(objs: list, meshes: list, mode: str) -> str:
+    """정면을 Blender **+Y** 로 맞춘다(= glTF/Godot 의 -Z).
+
+    🛑 **리깅 전에 부르지 않는다.** ARP·Mixamo 는 -Y 정면을 전제한다.
+       이 함수는 export_godot_glb.py 가 리깅·애니 후에 쓴다.
+
+    🛑 이 단계를 빼면 캐릭터가 Godot 에서 **180도 반대**를 본다. 이동은 맞게
+    하는데 얼굴이 뒤를 향해 "뒷걸음질" 로 보이고, 방향키가 반대로 동작하는
+    것처럼 느껴진다(실측 2026-09-02 exosuit).
+
+    🛑 Godot 에서 `rotation.y += PI` 로 덮지 않는다 — 캐릭터마다 반복되고,
+    BoneAttachment3D 로 붙이는 무기까지 전부 따라 틀어진다. **에셋에서 고친다.**
+
+    ⚠️ assets-3d.md 의 "-Y forward 로 내보낸다" 는 **FBX 익스포터 설정**이다.
+    glTF 익스포터에는 forward 옵션이 없고 Blender +Y 가 그대로 -Z 가 된다.
+    """
+    if mode == "skip":
+        return "skip"
+    cur = detect_forward(meshes) if mode == "auto" else mode
+    if cur == "+Y":
+        return cur
+    # Z축 180도 회전으로 정면을 +Y 로 돌린다.
+    ensure_object_mode()
+    select_only(objs)
+    bpy.ops.transform.rotate(value=math.pi, orient_axis="Z",
+                             orient_type="GLOBAL", center_override=(0.0, 0.0, 0.0))
+    apply_transforms(objs)
+    return cur
 
 
 def unparent_keep_transform(objs: list) -> list:
@@ -545,11 +608,33 @@ def main() -> int:
     # prop 은 "키" 개념이 없으므로 기본은 원본 크기를 유지한다. 다만 --height 를
     # 명시하면 그 길이에 맞춘다 — 무기를 캐릭터에서 분리해 뽑을 때 필요하다
     # (분리하면 캐릭터 스케일 기준을 잃어 4cm 짜리 검이 나온다. 실측 2026-09-02).
+    # --scale 은 목표 크기에 곱하는 배율이다(1.2 → 1.8×1.2 = 2.16 m).
     if args.kind == "prop":
-        factor = (args.height / h) if args.height else 1.0
+        target_h = (args.height * args.scale) if args.height else None
+        factor = (target_h / h) if target_h else 1.0
     else:
-        factor = (args.height or DEFAULT_HEIGHT) / h
+        target_h = (args.height or DEFAULT_HEIGHT) * args.scale
+        factor = target_h / h
     targets = meshes + arms
+
+    # ── 정면 확인만 한다 — 🛑 여기서 돌리지 않는다 ────────────────────────
+    #
+    # ARP Smart 와 Mixamo 는 **캐릭터가 -Y 를 향한다고 전제**한다. 리깅 전에
+    # +Y 로 돌려 놓으면 ARP 가 뒤통수를 얼굴로 착각해 **몸통·머리 본을 반대로**
+    # 심는다(실측 2026-09-02: 다리는 맞는데 허벅지·등·머리만 180° 뒤집혀
+    # "뒤로 걷는" 결과가 나왔다 — 다리는 좌우 대칭이라 티가 덜 났다).
+    #
+    # 그래서 Blender 작업 공간은 **-Y 정면 그대로 두고**, Godot 을 향한 180°
+    # 회전은 리깅·애니가 끝난 **export_godot_glb.py 에서** 한다.
+    if args.kind in ("human", "animal") and args.forward != "skip":
+        cur = detect_forward(meshes) if args.forward == "auto" else args.forward
+        report["forward_blender"] = cur
+        if cur == "-Y":
+            log("정면 -Y 확인 — ARP 규약대로 유지한다"
+                "(Godot 용 180° 회전은 export 단계에서 한다)")
+        else:
+            log(f"[WARN] 정면이 {cur} 다 — ARP 는 -Y 를 전제한다. "
+                f"리깅이 어긋나면 --forward 로 확인할 것")
 
     # 🛑 부모를 끊어 이중 적용을 막는다(unparent_keep_transform 주석 참조).
     parenting = unparent_keep_transform(targets)
@@ -561,7 +646,7 @@ def main() -> int:
         select_only(targets)
         bpy.ops.transform.resize(value=(factor, factor, factor))
         apply_transforms(targets)
-        log(f"키 {h:.4f} → {args.height:.4f} ({factor:.6f} 배)")
+        log(f"키 {h:.4f} → {target_h:.4f} ({factor:.6f} 배{', scale ' + str(args.scale) if args.scale != 1.0 else ''})")
 
     # 스케일이 끝난 뒤 다시 재서 이동량을 잡는다 — 순서를 섞으면 어긋난다.
     lo, hi = world_bbox(meshes)
@@ -607,7 +692,8 @@ def main() -> int:
     problems = []
     if abs(lo.z) > 1e-3:
         problems.append(f"발바닥이 원점에서 {lo.z:+.5f} 벗어났다")
-    want_h = args.height or (None if args.kind == "prop" else DEFAULT_HEIGHT)
+    want_h = (args.height * args.scale) if args.height else (
+        None if args.kind == "prop" else DEFAULT_HEIGHT * args.scale)
     if want_h and abs(h - want_h) > 1e-3:
         problems.append(f"크기가 {h:.5f} 로 목표 {want_h} 와 다르다")
     if args.triangles and tris > args.triangles * 1.05:

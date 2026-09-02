@@ -8,6 +8,8 @@
 - [명령 사용법](#명령-사용법)
 - [🛑 출력 위치 — `./outputs` 가 기본이다](#-출력-위치--outputs-가-기본이다)
 - [🛑 정규화 규약 — 이 문서의 핵심](#-정규화-규약--이-문서의-핵심)
+- [🛑🛑 정면 교정은 리깅 후다](#-정면-교정은-리깅-후다--순서를-앞당기면-몸통만-뒤집힌다)
+- [🎬 씬에 표시하기 → godot-scene.md](godot-scene.md)
 - [전체 흐름](#전체-흐름)
 - [① Tripo3D 생성 설정](#-tripo3d-생성-설정)
 - [② 정규화 — normalize_for_godot.py](#-정규화--normalize_for_godotpy)
@@ -20,6 +22,7 @@
 - [🛑 진단 — "Godot 에 안 보인다"](#-진단--godot-에-안-보인다)
 - [실측 사례 — male.glb](#실측-사례--maleglb)
 - [스크립트의 핵심 로직](#스크립트의-핵심-로직)
+- [🛑 겪은 사고 전부 → troubleshooting.md](troubleshooting.md)
 
 ---
 
@@ -141,11 +144,55 @@ GLB 를 고쳐 1.8m 로 만듦 (근본 해결)
 
 | # | 보장 | 검사 |
 |---|---|---|
-| 1 | Blender 월드 **Z-up · 정면 −Y** | Godot 이 Y-up · 정면 −Z 로 변환 |
+| 1 | Blender 월드 **Z-up · 정면 +Y** | glTF 가 -Z 로 바꿔 Godot 정면과 일치. 🛑 **−Y 가 아니다** |
 | 2 | **키 1.8 m** | bbox 높이 |
 | 3 | **발바닥이 원점** (bbox Z_min = 0) | 좌우·앞뒤 중심도 원점 |
 | 4 | **loc 0 · rot 0 · scale 1** — 전부 Apply | glTF 루트에 변환이 실리지 않는다 |
 | 5 | **메시 1개 · 머티리얼 1개** | 드로우콜 |
+
+### 🛑🛑 정면 교정은 **리깅 후**다 — 순서를 앞당기면 몸통만 뒤집힌다
+
+**Godot 의 정면은 −Z** 이고 glTF 변환은 **Blender +Y → −Z** 다. 그래서 최종 GLB 는
+Blender 기준 **+Y 정면**이어야 한다. 문제는 **언제 돌리느냐**다.
+
+| 단계 | Blender 정면 | 이유 |
+|---|---|---|
+| ② 정규화 · ③ 리깅 · ⑦ 애니 | **−Y 그대로 둔다** | 🛑 **ARP·Mixamo 가 −Y 를 전제**한다 |
+| ④ export 직전 | **+Y 로 180° 회전** | glTF 에서 −Z = Godot 정면 |
+
+#### 🛑 리깅 전에 돌리면 이렇게 깨진다 (2026-09-02 실측)
+
+ARP Smart 는 **캐릭터가 −Y 를 향한다고 전제**하고 마커에서 리그를 만든다.
+리깅 전에 +Y 로 돌려 놓으면 **뒤통수를 얼굴로 착각**해 몸통·머리 본을 반대로 심는다.
+
+```
+증상 — 다리·무릎·발은 방향이 맞는데
+       허벅지·엉덩이·등·머리만 180° 뒤집혀 "뒤로 걷는다"
+```
+
+**다리는 좌우 대칭이라 티가 나지 않아** 원인을 찾기 어렵다. 이동은 정상이고
+발도 제대로 향하므로 코드를 의심하게 되지만, **문제는 리그다.**
+
+#### 반대로 이 단계를 빼면
+
+캐릭터가 Godot 에서 **통째로** 뒤를 본다(Blender −Y → glTF +Z). 이때는 몸통과 다리가
+**함께** 뒤집히므로 위의 증상과 구별된다.
+
+| 증상 | 원인 |
+|---|---|
+| **통째로** 뒤를 본다 | 정면 교정을 **안 했다** → `export_godot_glb.py` 가 처리 |
+| **몸통만** 뒤집혔다(다리는 정상) | 정면 교정을 **리깅 전에** 했다 → 리깅부터 다시 |
+
+⚠️ **assets-3d.md 의 "−Y forward 로 내보낸다" 와 혼동하지 말 것** — 그것은 **FBX
+익스포터의 `axis_forward` 설정**이다. glTF 익스포터에는 forward 옵션이 아예 없고
+Blender +Y 가 그대로 −Z 가 된다. **포맷이 다르면 규약도 다르다.**
+
+🛑 **Godot 에서 `rotation.y += PI` 로 덮지 않는다.** 캐릭터마다 반복되고,
+`BoneAttachment3D` 로 붙이는 무기까지 전부 따라 틀어진다 → CLAUDE.md "에셋에서 고친다".
+
+**판별법** — 사람·인간형은 발뒤꿈치보다 발가락이 길다. 발 영역(하위 12%)의 y 분포에서
+중앙값 기준 더 멀리 뻗은 쪽이 정면이다. `export_godot_glb.py` 가 자동으로 판별하며,
+`--no-face-godot` 으로 끌 수 있다.
 
 ---
 
@@ -172,6 +219,7 @@ GLB 를 고쳐 1.8m 로 만듦 (근본 해결)
 |---|---|
 | **정규화 → 리깅** | 리깅 후 스케일을 바꾸면 본 길이와 액션 위치 키가 어긋난다 |
 | **애니 적용 → 본 감축** | 감축을 먼저 하면 Mixamo 의 어깨·목 트랙이 갈 곳을 잃어 **그 회전이 사라진다.** 뒤에 하면 베이크가 팔·머리로 흡수한다 |
+| **리깅·애니 → 정면 교정** | 🛑 교정을 먼저 하면 ARP 가 뒤통수를 얼굴로 착각해 **몸통·머리 본만 반대로** 심는다(다리는 정상이라 티가 안 난다) |
 
 ---
 
@@ -232,6 +280,8 @@ echo "종료코드=$?"    # 0 = 통과
 | `--height` | 1.8 | 목표 키(m) |
 | `--triangles` | 4800 | 0 이면 줄이지 않는다 |
 | `--kind` | human | `prop` 은 `--height` 를 **명시했을 때만** 크기를 맞춘다 |
+| **`--scale`** | 1.0 | **최종 크기 배율.** `--height` 에 곱한다(1.2 → 2.16 m) |
+| **`--forward`** | `auto` | 정면 판별. `auto`(발가락) · `+Y` · `-Y` · `skip` |
 | `--rigged` | off | **이미 리깅된 파일을 고칠 때만.** 아래 참조 |
 | **`--exclude`** | 없음 | **제외할 메시(쉼표 구분). 🛑 무기는 반드시 제외한다** |
 | **`--only`** | 없음 | 이 메시만 남긴다(무기만 따로 뽑을 때) |
@@ -288,40 +338,94 @@ blender --background --python .../normalize_for_godot.py -- \
 
 [SKILL.md ④](../SKILL.md) 의 ARP 절차와 **완전히 같다.** Godot 경로라고 달라지는 것이 없다.
 
-- `Auto-Rig Pro: Smart` → `Get Selected Objects` → 마커 → `Go!`
-- 🛑 **`Match to Rig`** 를 반드시 누른다 (안 누르면 Bind·Export 가 거부)
-- `Bind to Rig`
-- `<NAME>_rig.blend` 로 저장
+**스크립트 한 줄로 끝난다** — 마커 실측부터 Bind 까지 자동이다:
+
+```bash
+# 🛑 --background 를 붙이지 않는다(창이 뜨지만 스크립트가 끝내고 닫는다)
+blender outputs/<NAME>/<NAME>_norm.blend \
+  --python .claude/skills/model/scripts/arp_autorig.py -- outputs/<NAME>/<NAME>_rig.blend
+```
+
+결과는 `<NAME>_rig.blend.log.json` 에 남는다 — `bind_to_rig: {'FINISHED'}` 와
+본 개수를 확인한다. 손으로 할 때의 순서는 `Get Selected Objects` → 마커 → `Go!` →
+🛑 **`Match to Rig`**(안 누르면 Bind·Export 가 거부) → `Bind to Rig` 다.
+
+🛑 **입력은 -Y 정면이어야 한다.** ARP 는 그것을 전제로 리그를 만든다.
+Godot 용 180° 회전은 ④ export 가 한다 — 순서를 앞당기면 몸통만 뒤집힌다.
 
 **손가락은 리깅해도 된다.** ④ 의 본 감축이 어차피 제거하고, ARP 의 `LEGACY` 손가락
 엔진을 끄는 것보다 켜 두는 편이 마커 감지가 안정적이다.
 
-### 🛑 ARP 는 `--background` 에서 **구조적으로 불가능**하다 (2026-09-02 실측)
+### 🛑🛑 ARP 는 자동화된다 — "사람이 해야 한다" 는 **오판이었다** (2026-09-02)
 
-시도하지 말 것. 첫 연산자에서 바로 죽는다:
+> **한 번 저지른 실수다. 다시 반복하지 않는다.**
+>
+> `--background` 에서 실패한 것을 보고 **"ARP 는 자동화가 구조적으로 불가능하니
+> 사람이 GUI 에서 해야 한다"** 고 결론냈다. **틀렸다.**
+> 사람 개발자가 "다른 AI 는 잘 해왔다" 고 지적해 다시 확인한 끝에,
+> **GUI 모드로 띄우면 그대로 동작한다**는 것을 실측으로 확인했다.
 
-```
-bpy.ops.id.get_selected_objects()
-  → _get_selected_objects() → set_selection_filters()
-  → space_view3d = [i for i in current_area.spaces if i.type == "VIEW_3D"]
-AttributeError: 'NoneType' object has no attribute 'spaces'
-```
+**무엇을 잘못했나 — 일반화의 오류**
 
-**ARP 가 3D 뷰 `area` 를 직접 참조**하는데 `--background` 에는 area 자체가 없다.
-`temp_override` 로도 만들어 줄 수 없다(window·screen이 없으므로). 즉 **리깅에는
-GUI Blender 가 반드시 필요하다** — 이것이 ④ 가 "유일한 GUI 단계" 인 진짜 이유다.
-
-**두 경로 중 하나를 쓴다:**
-
-| 경로 | 방법 |
+| | |
 |---|---|
-| **Blender MCP** | GUI Blender 실행 + MCP 애드온 → `bpy.app.timers` 안에서 `temp_override(window, area, region)` ([SKILL.md](../SKILL.md) ④-A 5번) |
-| **사람이 직접** | ARP 패널에서 Smart → Match to Rig → Bind → `<NAME>_rig.blend` 저장 |
+| 관찰한 사실 | `blender **--background**` 에서 `get_selected_objects()` 가 `current_area.spaces` → `NoneType` 로 죽는다 |
+| 내린 결론 🛑 | "ARP 는 자동화 불가. 사람이 해야 한다" |
+| **실제** ✅ | **`--background` 하나의 제약**일 뿐. GUI 모드에는 `area` 가 있어 정상 동작한다 |
+| 더 나쁜 것 | **해법이 이미 [SKILL.md](../SKILL.md) ④-A 5번에 적혀 있었다** — `bpy.app.timers` + `temp_override(window, area, region)`. 읽고도 쓰지 않았다 |
 
-⚠️ **리깅 전까지의 단계(② 정규화)와 이후 단계(④ 애니·본 감축·GLB·검증)는 전부
-`--background` 로 자동화된다.** 사람이 개입하는 것은 리깅 하나뿐이다.
+**교훈 — 다음에 막히면 이 순서로 확인한다**
 
-**입력은 ② 가 만든 `<NAME>_norm.blend`** 다. Tripo 원본을 바로 리깅하지 않는다.
+1. **실행 모드를 바꿔 본다.** `--background` 가 안 되면 **GUI 모드**(`blender file.blend --python script.py`)를 시도한다. 창이 뜨지만 스크립트는 자동 실행되고, 끝나면 `bpy.ops.wm.quit_blender()` 로 닫으면 된다 — **완전 자동화다.**
+2. **스킬 문서를 먼저 다시 읽는다.** ④-A 의 함정 5가지가 그 답이었다.
+3. **"불가능" 이라고 쓰기 전에 한 번 더 의심한다.** 한 가지 방법이 막힌 것과 그 도구가 불가능한 것은 다르다.
+
+### 동작하는 방법 — GUI 모드 자동 리깅
+
+```bash
+# 🛑 --background 를 **붙이지 않는다**. 창이 뜨지만 스크립트가 알아서 끝내고 닫는다.
+blender outputs/<NAME>/<NAME>_norm.blend --python arp_rig.py
+```
+
+```python
+def run():
+    w  = bpy.context.window_manager.windows[0]
+    a  = next(x for x in w.screen.areas if x.type == 'VIEW_3D')
+    rg = next(r for r in a.regions if r.type == 'WINDOW')
+    with bpy.context.temp_override(window=w, area=a, region=rg):
+        ...  # 여기서 ARP 연산자가 전부 동작한다
+    bpy.ops.wm.save_as_mainfile(filepath=OUT)
+    bpy.ops.wm.quit_blender()
+    return None
+
+# 🛑 타이머로 미룬다 — 스크립트가 로드되는 시점에는 아직 창이 준비되지 않았다.
+bpy.app.timers.register(run, first_interval=2.0)
+```
+
+**실측으로 넘은 관문 4가지** (전부 오류 없이 조용히 실패하거나 거부한다):
+
+| # | 걸림돌 | 해결 |
+|---|---|---|
+| 1 | `--background` 에서 `current_area.spaces` → `NoneType` | **GUI 모드 + `temp_override`** |
+| 2 | `arp.guess_markers` → `AI files are missing` | 마커를 **메시에서 실측**해 `id.add_marker('EXEC_DEFAULT')` 로 직접 배치 |
+| 3 | `go_detect.poll() failed` | `get_selected_objects()` 가 원본을 숨기므로 **`body_temp` 를 active** 로 |
+| 4 | `match_to_rig` 후 **EDIT_ARMATURE 모드**로 남아 Bind 가 `poll() failed` | **Object 모드로 복귀**시킨 뒤 Bind |
+
+### 마커 좌표는 메시에서 실측한다
+
+AI 배치를 못 쓰므로 6개 마커를 직접 잰다. **표를 베끼지 말고 모델마다 다시 잰다.**
+
+| 마커 | 재는 법 | exosuit 실측(키 1.8) |
+|---|---|---|
+| `neck` | 어깨 위에서 `|x|max` 가 **최소**인 z | (0, −0.015, 1.593) |
+| `chin` | neck 보다 한 단 위, **정면(+Y) 쪽** 얼굴 표면 | (0, **+0.065**, 1.629) |
+| `shoulder` | 몸통 폭 × 0.85, 팔 중심 높이 | (0.152, −0.019, 1.332) |
+| `hand` | 팔 구간에서 단면 두께가 **꺾이는** x (손목) | (0.735, −0.019, 1.332) |
+| `root` | 가랑이 — 다리 모은 모델은 탐지가 빗나가므로 **키의 57%** 로 폴백 | (0, −0.017, 1.026) |
+| `foot` | 발 영역의 x 중앙, z 는 키의 5.5% | (0.119, −0.023, 0.099) |
+
+🛑 **`chin` 은 정면 쪽이어야 한다.** 정규화가 정면을 **+Y** 로 맞추므로 `max(y)` 로 잡는다.
+`min(y)` 로 잡으면 뒤통수에 놓여 **머리 본이 뒤를 향한다**(실측으로 겪었다).
 
 ---
 

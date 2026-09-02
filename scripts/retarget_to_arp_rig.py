@@ -29,10 +29,23 @@ import os
 import sys
 from mathutils import Matrix
 
+# 우선 순서 힌트일 뿐이다 — 실제로 처리하는 것은 **폴더에 있는 .fbx 전부**다.
+# 🛑 목록을 고정하면 프로젝트마다 다른 행동을 놓친다. 실측(2026-09-02): Godot
+# 규격은 idle/walk/run/**attack**/death 인데 이 목록에 attack 이 없어
+# 공격 모션이 조용히 빠진 채 리타게팅이 "성공" 으로 끝났다.
 ACTIONS = [
-    "idle", "walk", "run", "slash",
+    "idle", "walk", "run", "attack", "slash",
     "standing_gun_shooting", "walking_gun_shooting", "death",
 ]
+
+
+def resolve_actions(anim_dir):
+    """폴더의 .fbx 를 전부 고른다. ACTIONS 에 있는 것을 앞에 둔다."""
+    from pathlib import Path as _P
+    found = sorted(p.stem for p in _P(anim_dir).glob("*.fbx"))
+    ordered = [a for a in ACTIONS if a in found]
+    ordered += [f for f in found if f not in ACTIONS]
+    return ordered
 
 
 def rotm(M):
@@ -182,7 +195,7 @@ def main():
     tgt = max(arms, key=lambda o: len(o.data.bones))
 
     made = []
-    for name in ACTIONS:
+    for name in resolve_actions(anim_dir):
         src_path = os.path.join(anim_dir, name + ".fbx")
         if not os.path.exists(src_path):
             print(f"[건너뜀] {name}: 원본 없음 {src_path}")

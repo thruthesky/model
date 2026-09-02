@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -66,6 +67,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                     help="본 감축 시 추가로 남길 본(쉼표 구분)")
     ap.add_argument("--texture", type=int, default=DEFAULT_TEXTURE,
                     help=f"텍스처 최대 변 길이. 기본 {DEFAULT_TEXTURE}")
+    ap.add_argument("--no-face-godot", action="store_true",
+                    help="Godot 정면(-Z) 맞추기를 끈다. 기본은 켜짐 — "
+                         "Blender -Y 정면을 180° 돌려 glTF 에서 -Z 가 되게 한다")
     ap.add_argument("--no-reset", action="store_true",
                     help="RESET 애니메이션을 만들지 않는다")
     return ap.parse_args(argv)
@@ -130,6 +134,101 @@ def resize_textures(limit: int) -> list[str]:
     return changed
 
 
+def detect_forward(meshes: list) -> str:
+    """발가락 방향으로 Blender 기준 정면을 판별한다 — '+Y' 또는 '-Y'.
+
+    사람·인간형은 발뒤꿈치보다 발가락이 길다. 발 영역(하위 12%)의 y 분포에서
+    중앙값 기준 더 멀리 뻗은 쪽이 정면이다.
+    """
+    zs = []
+    for o in meshes:
+        mw = o.matrix_world
+        zs.extend((mw @ v.co).z for v in o.data.vertices)
+    if not zs:
+        return "-Y"
+    zmin, zmax = min(zs), max(zs)
+    h = zmax - zmin
+    ys = []
+    for o in meshes:
+        mw = o.matrix_world
+        for v in o.data.vertices:
+            w = mw @ v.co
+            if w.z < zmin + h * 0.12:
+                ys.append(w.y)
+    if len(ys) < 8:
+        return "-Y"
+    ys.sort()
+    med = ys[len(ys) // 2]
+    return "-Y" if (med - ys[0]) > (ys[-1] - med) else "+Y"
+
+
+def face_godot_forward(arm, meshes: list) -> str:
+    """리그·메시를 함께 180° 돌려 Godot 정면(-Z)에 맞춘다.
+
+    🛑 **이 단계는 리깅·애니가 끝난 뒤에 온다.** 순서를 앞당기면 안 된다:
+
+      · ARP Smart 와 Mixamo 는 **캐릭터가 -Y 를 향한다고 전제**한다.
+      · 리깅 전에 +Y 로 돌려 놓으면 ARP 가 뒤통수를 얼굴로 착각해
+        **몸통·머리 본을 반대로** 심는다.
+      · 실측(2026-09-02 exosuit): 다리·무릎·발은 맞는데 허벅지·엉덩이·등·머리만
+        180° 뒤집혀 **"뒤로 걷는"** 결과가 나왔다. 다리는 좌우 대칭이라
+        티가 덜 나서 원인을 찾기 어려웠다.
+
+    반대로 이 단계를 **빼면** 캐릭터가 Godot 에서 통째로 뒤를 본다
+    (Blender -Y → glTF +Z, Godot 표준은 -Z).
+
+    액션을 떼고 돌린 뒤 되돌린다 — `transform_apply` 는 애니메이션이 붙은
+    오브젝트를 거부하기 때문이다.
+    """
+    targets = [arm] + list(meshes)
+    cur = detect_forward(meshes)
+    if cur == "+Y":
+        return cur
+
+    # 액션 분리 + 포즈 초기화 (transform_apply 가 거부하지 않도록)
+    saved = []
+    for o in targets:
+        ad = o.animation_data
+        if ad and ad.action:
+            saved.append((o, ad.action, getattr(ad, "action_slot", None)))
+            ad.action = None
+    for pb in arm.pose.bones:
+        pb.matrix_basis = IDENTITY
+    bpy.context.view_layer.update()
+
+    # 부모를 끊어 이중 적용을 막는다
+    children = [o for o in targets if o.parent is not None]
+    parenting = [(o, o.parent) for o in children]
+    if children:
+        select_only(children)
+        bpy.ops.object.parent_clear(type="CLEAR_KEEP_TRANSFORM")
+
+    ensure_object_mode()
+    select_only(targets)
+    bpy.ops.transform.rotate(value=math.pi, orient_axis="Z",
+                             orient_type="GLOBAL", center_override=(0.0, 0.0, 0.0))
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+
+    for child, parent in parenting:
+        select_only([child])
+        parent.hide_set(False)
+        parent.select_set(True)
+        bpy.context.view_layer.objects.active = parent
+        bpy.ops.object.parent_set(type="OBJECT", keep_transform=True)
+
+    for o, act, slot in saved:
+        if not o.animation_data:
+            o.animation_data_create()
+        o.animation_data.action = act
+        if slot is not None:
+            try:
+                o.animation_data.action_slot = slot
+            except (AttributeError, TypeError):
+                pass
+    bpy.context.view_layer.update()
+    return cur
+
+
 def rig_scale_ref(arm) -> float:
     """리그의 크기 기준값 — Hips rest head 까지의 거리.
 
@@ -168,6 +267,48 @@ def scale_action_locations(act, factor: float) -> int:
             kp.handle_right[1] *= factor
         touched += 1
     return touched
+
+
+def strip_root_motion(act, arm, height: float) -> list[str]:
+    """Hips 의 **전진(root motion)** 을 제거하고 상하 바운스는 남긴다.
+
+    🛑 Godot 에서는 캐릭터 이동을 코드(CharacterBody3D)가 한다. 애니에 남은
+    전진이 겹치면 캐릭터가 제자리에서 밀려나거나 공중으로 떠오른다.
+
+    실측(2026-09-02 exosuit): `walk` 재생 중 발바닥이 +0.211 → **+1.663 m** 로
+    떠올랐다. Mixamo walk 가 in-place 가 아니라 전진하는 애니여서다.
+
+    **판별은 drift 로 한다** — 첫 프레임과 마지막 프레임의 차이가 큰 축이
+    전진이다. 상하 바운스는 왕복이라 drift 가 거의 0 이므로 그대로 살아남는다.
+    """
+    curves = []
+    try:
+        for layer in act.layers:
+            for strip in layer.strips:
+                for bag in strip.channelbags:
+                    curves.extend(bag.fcurves)
+    except AttributeError:
+        curves = list(getattr(act, "fcurves", []))
+
+    hips = [fc for fc in curves
+            if fc.data_path.endswith(".location") and "Hips" in fc.data_path]
+    stripped = []
+    for fc in hips:
+        kps = fc.keyframe_points
+        if len(kps) < 2:
+            continue
+        vals = [kp.co[1] for kp in kps]
+        drift = abs(vals[-1] - vals[0])
+        # 키의 15% 넘게 한 방향으로 밀리면 전진으로 본다.
+        if drift < height * 0.15:
+            continue
+        base = vals[0]
+        for kp in kps:
+            kp.co[1] = base
+            kp.handle_left[1] = base
+            kp.handle_right[1] = base
+        stripped.append(f"axis{fc.array_index}(drift {drift:.2f}m)")
+    return stripped
 
 
 def import_animations(folder: Path, arm) -> list[str]:
@@ -352,6 +493,23 @@ def main() -> int:
         if missing:
             log(f"[WARN] 규격 행동이 빠졌다: {', '.join(missing)} "
                 f"— Godot 에서 그 상태는 재생되지 않는다")
+    elif arm and bpy.data.actions:
+        # 🛑 `.blend` 에 이미 액션이 있으면 그것을 쓴다(built-in).
+        #
+        # ⑦ retarget_to_arp_rig.py 가 rest pose 를 보정해 구운 액션이 여기 들어
+        # 있다. 그것을 두고 --animations 로 **원본 Mixamo fbx 를 다시 임포트하면
+        # 그 보정이 통째로 무시되어** 팔이 만세로 올라간다(SKILL.md ⑦).
+        want = ACTIONS_HUMAN if args.kind == "human" else ACTIONS_MOB
+        have = {a.name for a in bpy.data.actions}
+        anim_names = [w for w in want if w in have]
+        extra = sorted(have - set(want) - {"RESET"})
+        log(f"애니 소스 : 캐릭터 내장(built-in) — {len(anim_names)}종: "
+            f"{', '.join(anim_names) or '없음'}")
+        if extra:
+            log(f"  (규격 외라 내보내지 않음: {', '.join(extra)})")
+        missing = [w for w in want if w not in have]
+        if missing:
+            log(f"[WARN] 규격 행동이 빠졌다: {', '.join(missing)}")
     else:
         # 사용자가 명시적으로 요구한 안내다. 조용히 넘어가면 나중에 원인을 못 찾는다.
         log("")
@@ -391,9 +549,56 @@ def main() -> int:
         anim_names = anim_names + ["RESET"]
         log("RESET 액션 생성 — Godot 블렌딩의 기준 포즈")
 
+    # 🛑 root motion 제거 — Godot 은 이동을 코드가 한다(strip_root_motion 주석 참조).
+    #
+    # **이동 애니에만** 적용한다. death 처럼 쓰러지며 자리를 옮기는 동작은 그
+    # 변위가 연출의 일부라, 제거하면 오히려 공중에 뜬다(실측: death 발바닥이
+    # +0.99 m 로 올라갔다).
+    LOCOMOTION = {"walk", "run"}
+    if arm:
+        for nm in [n for n in anim_names if n in LOCOMOTION]:
+            a = bpy.data.actions.get(nm)
+            if not a:
+                continue
+            got = strip_root_motion(a, arm, 1.8)
+            if got:
+                log(f"  {nm}: root motion 제거 — {', '.join(got)}")
+
     if arm and anim_names:
         pushed = push_actions_to_nla(arm, anim_names)
         log(f"NLA 트랙 {pushed}개로 분리 — glTF 가 애니메이션을 따로 내보내게 한다")
+
+    # ── Godot 정면(-Z) 맞추기 — 🛑 리깅·애니가 끝난 지금 한다 ─────────────
+    if arm and args.kind in ("human", "animal") and not args.no_face_godot:
+        was = face_godot_forward(arm, meshes)
+        if was == "-Y":
+            log("정면 교정 — Blender -Y → +Y 로 180° 회전 "
+                "(glTF 에서 -Z = Godot 정면)")
+        else:
+            log("정면 이미 +Y — 교정 불필요")
+
+    # ── 캐릭터가 아닌 메시 제거 ───────────────────────────────────────────
+    # 🛑 ARP 리깅·리타게팅은 컨트롤러 위젯(`cs_*`)이나 임시 프리미티브를 씬에
+    # 남긴다. 그것들이 GLB 에 함께 실리면 **bbox 를 부풀려** 캐릭터가 실제보다
+    # 크게 잡히고, Godot 에서 보이지 않는 덩어리가 따라다닌다.
+    #
+    # 실측(2026-09-02 exosuit): `Icosphere` 하나가 z −1.0 까지 뻗어 키가
+    # 1.80 → 2.70 m 로 잡혔다. 애니가 폭발한 것으로 오진하기 쉽다.
+    #
+    # 판정 기준은 **armature modifier 보유 여부** — 스킨된 메시만 캐릭터다.
+    if arm:
+        dropped = []
+        for o in list(bpy.data.objects):
+            if o.type != "MESH":
+                continue
+            skinned = any(m.type == "ARMATURE" for m in o.modifiers)
+            if not skinned and o.parent_type != "BONE":
+                dropped.append(f"{o.name}({len(o.data.polygons)}폴리곤)")
+                bpy.data.objects.remove(o, do_unlink=True)
+        if dropped:
+            log(f"캐릭터가 아닌 메시 {len(dropped)}개 제거: {', '.join(dropped[:5])}"
+                f"{' …' if len(dropped) > 5 else ''}")
+        meshes = [o for o in bpy.data.objects if o.type == "MESH"]
 
     # ── 텍스처 ────────────────────────────────────────────────────────────
     changed = resize_textures(args.texture)

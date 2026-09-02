@@ -77,6 +77,8 @@ description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 A
 | 대상 | 산출물 | 문서 |
 |---|---|---|
 | **Godot 3D** (라리엔 3D) | **`<NAME>.glb`** — Godot 에 바로 넣는다 | 🛑 **[references/godot-pipeline.md](references/godot-pipeline.md)** |
+| ↳ 그 GLB 를 **씬에 올려 움직이기** | 이동·애니·버튼 데모 씬 | **[references/godot-scene.md](references/godot-scene.md)** |
+| ↳ **문제가 생겼을 때 / 처음 만들 때** | 🛑 **겪은 사고 전부 + 정답 순서** | **[references/troubleshooting.md](references/troubleshooting.md)** |
 | Flutter/Flame 2.5D (구 라리엔) | `<NAME>.png` + `.atlas` — 16방향 스프라이트 | **이 문서** 아래 전체 |
 
 **프로젝트가 Godot 이면 지금 [godot-pipeline.md](references/godot-pipeline.md) 로 간다.**
@@ -477,7 +479,40 @@ unzip -o outputs/tripo3d.ai/"<이름>_raw.zip" -d "$DST"
 모델과 같은 폴더의 `idle/walk/attack/death.fbx` 를 **1순위**로 집는다(`sheet.py:751-781`).
 우리는 `animations/default` 를 쓴다.
 
-## ④ Auto-Rig Pro 리깅 (Blender) — **이 단계만 GUI 다**
+## 🛑🛑 ARP 자동화 — "사람이 해야 한다" 고 **결론내지 않는다** (2026-09-02 오판 기록)
+
+> **한 번 저지른 실수다. 다시 반복하지 않는다.**
+
+`blender **--background**` 에서 ARP 가 `current_area.spaces` → `NoneType` 로 죽는 것을
+보고 **"ARP 는 자동화가 구조적으로 불가능하니 사람이 GUI 에서 해야 한다"** 고 결론냈다.
+**틀렸다.** 사람 개발자가 *"다른 AI 는 잘 해왔다"* 고 지적해 다시 확인한 끝에,
+**GUI 모드로 띄우면 그대로 동작한다**는 것을 실측했다 — 마커 배치부터 Bind 까지 전부.
+
+| | |
+|---|---|
+| 관찰 | `--background` 에서 첫 연산자가 죽는다 |
+| 잘못된 결론 🛑 | "ARP 는 자동화 불가" ← **한 실행 모드의 제약을 도구 전체로 일반화** |
+| 사실 ✅ | **GUI 모드**(`blender file.blend --python x.py`)에는 `area` 가 있어 정상 동작 |
+| 더 나쁜 것 | **해법이 바로 아래 ④-A 5번에 이미 적혀 있었다.** 읽고도 쓰지 않았다 |
+
+**막히면 이 순서로 확인한다** — ① `--background` 대신 **GUI 모드**를 시도한다
+(창이 뜨지만 `bpy.ops.wm.quit_blender()` 로 닫으면 완전 자동화다) →
+② **이 문서의 ④-A 함정 5가지를 먼저 다시 읽는다** →
+③ "불가능" 이라고 쓰기 전에 한 번 더 의심한다. **한 방법이 막힌 것과 도구가 불가능한
+것은 다르다.**
+
+**리깅은 스크립트 한 줄로 끝난다** — 마커 실측부터 Bind 까지 자동이다:
+
+```bash
+# 🛑 --background 를 붙이지 않는다. 창이 뜨지만 알아서 닫힌다
+blender outputs/<NAME>/<NAME>_norm.blend \
+  --python .claude/skills/model/scripts/arp_autorig.py -- outputs/<NAME>/<NAME>_rig.blend
+```
+
+상세는 [references/godot-pipeline.md](references/godot-pipeline.md) 의 「GUI 모드 자동 리깅」,
+겪은 사고 전부는 **[references/troubleshooting.md](references/troubleshooting.md)**.
+
+## ④ Auto-Rig Pro 리깅 (Blender) — **GUI 가 필요하다(자동화는 된다)**
 
 ⚠️ **ARP 의 Smart 는 마커 위치를 눈으로 확인**해야 하고, 모델마다 실패 양상이 다르다.
 `--background` 로 완전 자동화하지 않는다 — 자동으로 놓인 마커가 어깨 하나만 어긋나도 팔이
