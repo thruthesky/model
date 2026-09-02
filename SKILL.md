@@ -1,6 +1,6 @@
 ---
 name: model
-description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인**이다(원저자 2026-08-07). 원시 도형(box·sphere·cylinder·cone)을 조합해 캐릭터·몬스터·무기의 형상을 흉내내지 않는다 — 2026-08-07 에 몬스터가 "구슬+막대기", 무기가 "ㄱ 자 조각" 으로 나와 실패로 판명됐고, 같은 화면의 GLB 캐릭터만 AAA 급이었다. "임시로 도형으로 대신하자" 는 제안 자체를 하지 않는다. 형상이 필요하면 반드시 이 파이프라인을 탄다. 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【다리 모으기】"다리 모아줘", "다리가 벌어졌어", "양다리·무릎·발 붙여줘", "다리 벌어진 것 고쳐줘", "close legs", "차렷 자세로", "팔자 다리 고쳐줘" — pc/mob 의 다리가 벌어져 있으면 재생성하지 않고 Blender 에서 rest pose 를 고쳐 모은다(⑤-L, 벌어진 모델은 지시 없이도 자동 적용). 【동물형(비인간형)】"거미 몬스터 만들어줘", "지네/고질라/네발 짐승 만들어줘", "동물형 몬스터", "다족 몬스터", "사람 모양이 아닌 몬스터", "비인간형 리깅", "거미처럼 기어다니는 애니메이션" — Mixamo 에 해당 애니가 없고 ARP Smart 도 humanoid 전용이라 경로가 완전히 다르다(8방향·idle/walk/attack/death 4행동·128 cell, `outputs/` 저장). 상세는 references/non-humanoid.md. 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
+description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인**이다(원저자 2026-08-07). 원시 도형(box·sphere·cylinder·cone)을 조합해 캐릭터·몬스터·무기의 형상을 흉내내지 않는다 — 2026-08-07 에 몬스터가 "구슬+막대기", 무기가 "ㄱ 자 조각" 으로 나와 실패로 판명됐고, 같은 화면의 GLB 캐릭터만 AAA 급이었다. "임시로 도형으로 대신하자" 는 제안 자체를 하지 않는다. 형상이 필요하면 반드시 이 파이프라인을 탄다. **🛑 Godot 3D 프로젝트면 references/godot-pipeline.md 로 간다** — `/model --bones 16 --kind human --triangles 4800 --animations <폴더> "<프롬프트>"` 형식으로 Tripo3D 생성 → **리깅 전 정규화(키 1.8m·발바닥 원점·Z-up·scale 1)** → ARP 리깅 → Mixamo 애니 적용 → **본 감축(16 또는 25, 기본 16)** → 텍스처 1024 → `.glb` 로 내보내 Godot 에 바로 넣는다. 【Godot 관련 요청】"godot 용 모델 만들어줘", "glb 로 내보내줘", "본 16개로 줄여줘", "삼각형 줄여줘", "저사양용 캐릭터", **"모델이 Godot 에디터에 안 보여요"**, "캐릭터가 화면에 없어요", "모델이 너무 크다/작다", "원점이 머리 위에 있다", "발이 지면에 안 닿는다", "root_scale", "스케일이 이중 적용", "캐릭터가 누워 있다", "T-포즈로 안 움직인다", "애니메이션이 하나만 나온다" — 원인은 대부분 **Tripo 메시(Y-up·1.0)와 Mixamo 리그(Z-up·cm)의 좌표계 혼재**이고, 그것을 `.import` 의 root_scale 로 덮으면 더 크게 터진다. 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【다리 모으기】"다리 모아줘", "다리가 벌어졌어", "양다리·무릎·발 붙여줘", "다리 벌어진 것 고쳐줘", "close legs", "차렷 자세로", "팔자 다리 고쳐줘" — pc/mob 의 다리가 벌어져 있으면 재생성하지 않고 Blender 에서 rest pose 를 고쳐 모은다(⑤-L, 벌어진 모델은 지시 없이도 자동 적용). 【동물형(비인간형)】"거미 몬스터 만들어줘", "지네/고질라/네발 짐승 만들어줘", "동물형 몬스터", "다족 몬스터", "사람 모양이 아닌 몬스터", "비인간형 리깅", "거미처럼 기어다니는 애니메이션" — Mixamo 에 해당 애니가 없고 ARP Smart 도 humanoid 전용이라 경로가 완전히 다르다(8방향·idle/walk/attack/death 4행동·128 cell, `outputs/` 저장). 상세는 references/non-humanoid.md. 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
 ---
 
 # 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인이다**
@@ -70,7 +70,59 @@ description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 A
 
 ---
 
+# 🛑 첫 번째 분기 — **Godot 인가, 2.5D 인가**
+
+**출력 대상이 무엇인지부터 정한다.** 두 경로는 ③ 이후가 완전히 다르다.
+
+| 대상 | 산출물 | 문서 |
+|---|---|---|
+| **Godot 3D** (라리엔 3D) | **`<NAME>.glb`** — Godot 에 바로 넣는다 | 🛑 **[references/godot-pipeline.md](references/godot-pipeline.md)** |
+| Flutter/Flame 2.5D (구 라리엔) | `<NAME>.png` + `.atlas` — 16방향 스프라이트 | **이 문서** 아래 전체 |
+
+**프로젝트가 Godot 이면 지금 [godot-pipeline.md](references/godot-pipeline.md) 로 간다.**
+아래 ①~⑨ 는 2.5D 아틀라스를 굽는 경로이고, Godot 에서는 ⑧⑨ 를 쓰지 않는다.
+
+## `/model` 명령 사용법 (Godot 경로)
+
+```
+/model --bones 16 --kind human --triangles 4800 --animations <폴더> "<프롬프트>"
+```
+
+| 옵션 | 값 | 기본 | 뜻 |
+|---|---|---|---|
+| `--bones` | **16** · 25 | **16** | 본 예산. 저사양 우선이라 **최저 16 이 기본** |
+| `--kind` | **human** · animal · drone · prop | `human` | 형태 → 리깅 경로 |
+| `--triangles` | 1600 · 3200 · **4800** · 6400 · 7200 | **4800** | 삼각형 예산 |
+| `--animations` | 폴더 경로 | **없음** | Mixamo `.fbx` 폴더 |
+| `--height` | 미터 | 1.8 | 목표 키 |
+| `--texture` | 픽셀 | 1024 | 텍스처 최대 변 |
+
+🛑 **`--animations` 가 없으면 "애니메이션을 적용하지 않습니다" 를 알리고 정적 모델로
+진행한다.** 작업을 멈추지 않되, **끝난 뒤 한 번 더** 폴더를 지정해 달라고 말한다.
+
+> ⚠️ **`--kind` 는 두 종류가 있다.** Godot 경로는 **형태**(`human`/`animal`/`drone`/`prop`),
+> 2.5D 아틀라스(⑧)는 **게임 역할**(`pc`/`mob`/`npc`/`boss`/`minion`) 이다.
+
+### 🛑 Godot 경로의 절대 규약 — 리깅 전에 정규화한다
+
+> **Tripo3D 다운로드 직후, 리깅 전에, 키 1.8m · 발바닥 원점 · Z-up ·
+> scale 1 · rot 0 으로 정규화한다.**
+
+Tripo 메시는 **Y-up · 1.0 단위**, Mixamo 리그는 **Z-up · cm** 라서, 정규화 없이 붙이면
+두 좌표계가 섞이고 리깅·익스포트를 거치며 증폭된다. 실측(`male.blend` 2026-09-02):
+**메시는 똑바로 서고 아마추어만 90° 누웠으며**, GLB 에서 캐릭터가 원점 아래로
+매달려 Godot 에 보이지 않았다.
+
+🛑 **그리고 그것을 `.import` 의 `root_scale=150` 으로 덮은 것이 두 번째 사고를 만들었다** —
+GLB 를 근본 해결한 뒤에도 150 이 남아 **270m 거인**이 됐다.
+근거·수치·진단 절차는 [godot-pipeline.md](references/godot-pipeline.md).
+
+---
+
 # Tripo3D 캐릭터 → Auto-Rig Pro(Mixamo 리그) → 16방향 스프라이트 아틀라스
+
+**⚠️ 여기부터는 Flutter/Flame 2.5D 경로다.** Godot 이면 위 분기로 돌아간다.
+(①~⑦ 의 생성·리깅·Mixamo 애니는 두 경로가 공유한다 — 갈라지는 것은 ⑧ 부터다.)
 
 텍스트 프롬프트로 3D 캐릭터를 만들고, 리깅하고, Mixamo 애니메이션을 입혀,
 **게임에 넣을 수 있는 packed atlas** 로 굽는 전 과정. **두 단계로 나뉜다.**
@@ -275,10 +327,22 @@ Blender 로 다리를 모은다** — 크레딧 55~65 와 4분을 아끼고, 다
 정상인 액터에 "다리를 모으라" 고 하면 형상이 무너진다. 동물형은
 [references/non-humanoid.md](references/non-humanoid.md) 로 간다.
 
+### 🛑 생성 품질 설정 — Ultra Mesh 는 끄고 텍스처는 2K
+
+| 항목 | 값 | 왜 |
+|---|---|---|
+| **Ultra Mesh Quality** | 🛑 **끈다** | 폴리곤만 늘고 크레딧을 더 쓴다. 어차피 Decimate 로 깎는다 |
+| **Texture Quality** | **2K** | 8K 는 ZIP 이 지연되거나 아예 오지 않는다(크레딧만 차감). Godot 경로는 로컬에서 다시 1024 로 줄인다 |
+| 삼각형 | **최대 100만까지 허용** | 생성 단계에서 줄이지 않는다 — 로컬 Decimate 가 무료로 같은 일을 한다 |
+
 ### 폴리곤은 나중에 줄인다
 
 `HD Model` 은 약 200만 페이스를 만든다. **여기서 `Smart Mesh`·`Retopo` 로 줄이려 하지
 말 것** — 크레딧이 더 든다. ④ 의 Decimate 가 리깅 전에 안전하게 줄인다(실측: 191만 → 3만).
+
+**Godot 경로는 `--triangles` 로 예산을 지정한다**(1600·3200·**4800**·6400·7200).
+실측: 1,020,514 → 4,798 (형상 손실 없음) →
+[godot-pipeline.md](references/godot-pipeline.md).
 
 ⚠️ **스프라이트로 구울 것이므로 폴리곤 예산이 3D 런타임보다 훨씬 헐겁다.** 128px 셀에
 렌더할 뿐이라 페이스 수는 렌더 시간에만 영향을 준다. 그래도 Blender 뷰포트 조작이 느려지므로
