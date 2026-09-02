@@ -5,10 +5,11 @@
 
 ## 목차
 
+- [**❓ 질문으로 찾기 — 실제로 막힌 순서 그대로**](#-질문으로-찾기--실제로-막힌-순서-그대로)
 - [먼저 확인 — GLB 가 준비됐는가](#먼저-확인--glb-가-준비됐는가)
 - [**GLB 는 Godot 안에서 무엇이 되는가 — 임포트 해부**](#glb-는-godot-안에서-무엇이-되는가--임포트-해부)
 - [**🛑 씬 트리에 AnimationPlayer 가 보이지 않는다 — 정상이다**](#-씬-트리에-animationplayer-가-보이지-않는다--정상이다)
-- [**애니메이션이 도는 원리 — 🛑 자동이 아니다**](#애니메이션이-도는-원리--자동이-아니다)
+- [**애니메이션이 도는 원리 — 🛑 자동이 아니다**](#애니메이션이-도는-원리---자동이-아니다)
 - [**🛑🛑 실측으로 드러난 함정 — play() 는 되감지 않는다**](#-실측으로-드러난-함정--play-는-되감지-않는다)
 - [씬 구조](#씬-구조)
 - [인스펙터 값](#인스펙터-값)
@@ -17,6 +18,26 @@
 - [스크립트 — player_demo.gd](#스크립트--player_demogd)
 - [실행하는 법 (macOS)](#실행하는-법-macos)
 - [🛑 자주 겪는 문제](#-자주-겪는-문제)
+
+---
+
+## ❓ 질문으로 찾기 — 실제로 막힌 순서 그대로
+
+**GLB 를 씬에 올린 사람이 실제로 던진 질문들이다.** 순서까지 그대로 두었다 —
+같은 곳에서 같은 순서로 막히기 때문이다. 답의 요지만 적고, 근거는 각 절로 보낸다.
+
+| # | 질문 | 짧은 답 |
+|---|---|---|
+| 1 | **캐릭터 애니메이션은 어디서 오나? 3D 모델 안에 들어 있나?** | ✅ **`.glb` 안에 들어 있다.** `idle`·`walk`·`run`·`attack`·`death` 가 파일 안의 `animations` 배열이고, Godot 이 이것을 **`AnimationPlayer` 노드 하나**로 바꾼다 → [임포트 해부](#glb-는-godot-안에서-무엇이-되는가--임포트-해부) |
+| 2 | **3D 안에 있는 애니메이션이 어떻게 움직이나?** | 애니메이션은 **그림이 아니라 "뼈의 시간별 자세표"** 다. 엔진이 매 프레임 그 표를 읽어 뼈 23개에 써 넣고, **GPU 스키닝**이 피부를 뼈에 딸려 보낸다 → [같은 절](#실측--remove_immutable_tracks-가-트랙을-65-줄인다) |
+| 3 | **프로그램은 화살표 키로 움직이기만 하는데 어떻게 애니가 자동으로 동작하나?** | 🛑 **자동이 아니다.** `_physics_process` 안의 `if dir.length_squared() > 0.001` 한 줄이 매 프레임 직접 고른다. 그 줄을 지우면 **차렷 자세로 미끄러져 다닌다** → [애니가 도는 원리](#애니메이션이-도는-원리---자동이-아니다) |
+| 4 | **애니메이션을 플레이하면 자동으로 움직이게 되나?** | 🛑 **반대다.** 애니는 **제자리에서** 걷고, 이동은 `move_and_slide()` 가 시킨다. 실측 — `walk` 1.4초 동안 루트는 (0,0,0) 고정 → [같은 절](#-애니메이션은-캐릭터를-이동시키지-않는다--실측) |
+| 5 | **씬 트리에 `AnimationPlayer`·`Skeleton3D` 가 안 보인다. Inspector 에 나와야 하는 것 아닌가?** | ✅ **정상이다.** 인스턴스된 씬은 내부가 접힌다(🎬 아이콘). **Inspector 는 자식 목록을 보여주는 곳이 아니다.** `Editable Children` 으로 편다 → [안 보이는 이유](#-씬-트리에-animationplayer-가-보이지-않는다--정상이다) |
+| 6 | **펼쳤는데 애니메이션을 눈으로 어떻게 확인하나? 본은 찾았는데 애니를 못 찾겠다** | 하단 **Animation 패널**이 닫혀 있는 것이다. 가장 빠른 길은 **Inspector 첫 줄의 `Current Animation` 드롭다운** → [확인하는 5가지 경로](#애니메이션-목록을-확인하는-5가지-경로) |
+| 7 | **`["RESET","attack","death","idle","run","walk"]` 이 목록은 어디서 보나?** | 화면에서 볼 수 있는 곳이 **네 군데**, 코드·터미널까지 하면 **다섯 군데**다 → [같은 절](#애니메이션-목록을-확인하는-5가지-경로) |
+| 8 | **애니 패널을 열었는데 편집이 안 되고 루프도 못 켠다** | 🛑 **임포트된 애니는 에디터에서 읽기 전용이다.** 엔진이 직접 그렇게 말한다 → [읽기 전용](#-임포트된-애니는-에디터에서-읽기-전용이다) |
+| 9 | **캐릭터가 지면에서 떠 있다** | GLB 원점은 **발바닥**, 캡슐 원점은 **중심**이다. GLB 인스턴스 Position 은 `(0,0,0)` → [원점 규칙](#-캐릭터가-지면에서-떠-있다--원점-규칙이-노드마다-다르다) |
+| 10 | **공격 버튼 연타가 무시된다** | 🛑 **`play()` 는 같은 애니를 되감지 않는다**(4.7.2 실측). `stop()` 이나 `seek(0.0, true)` 가 필요하다 → [실측 함정](#-실측으로-드러난-함정--play-는-되감지-않는다) |
 
 ---
 
@@ -225,60 +246,181 @@ Scene 독에서 exosuit 우클릭 → "Editable Children" (자식 편집 가능)
    └─ AnimationPlayer          ← 선택하면 하단에 애니메이션 패널이 열린다
 ```
 
-### 🛑 그런데 `AnimationPlayer` 를 눌러도 애니메이션이 안 보인다
+### 🛑 펼쳤는데도 애니메이션이 안 보인다
 
 **펼치는 데까지 성공한 사람이 그다음에 반드시 막히는 곳이다.**
 `AnimationPlayer` 를 선택하면 Inspector 에는 `Current Animation`·`Speed Scale`·
 `Root Node` 같은 **속성만** 나오고, 정작 **애니메이션 목록이 어디에도 없어 보인다.**
 
-**애니메이션을 눈으로 보는 방법은 세 가지이고, 난이도 순서는 이렇다.**
+### 애니메이션 목록을 확인하는 5가지 경로
 
-#### ① 가장 빠르다 — Inspector 의 `Current Animation` 드롭다운
+**`["RESET","attack","death","idle","run","walk"]` 를 실제로 보는 방법이다.**
+①②③ 은 에디터, ④⑤ 는 화면에서 못 찾겠을 때의 확실한 우회로다.
 
-`AnimationPlayer` 를 선택하면 **Inspector 맨 첫 줄**에 있다.
+#### ① 하단 **Animation** 패널 — 재생·트랙까지 본다
 
-```
-Inspector
-  AnimationPlayer
-    Current Animation   [        ∨ ]   ← 여기를 클릭한다
-```
-
-누르면 **`RESET` · `attack` · `death` · `idle` · `run` · `walk`** 가 그대로 나오고,
-하나 고르면 **뷰포트의 캐릭터가 즉시 그 자세로 바뀐다.** T-포즈가 풀리는 것이 보이면
-GLB 가 정상이라는 뜻이다. **재생은 안 되고 정지 자세만 보인다.**
-
-#### ② 재생·트랙까지 본다 — 하단 **Animation 패널**
-
-**이 패널이 닫혀 있어서 "애니메이션이 없다" 고 오해하는 경우가 대부분이다.**
+**"애니메이션이 없다" 는 오해의 대부분이 이 패널이 닫혀 있어서 생긴다.**
+Godot 의 화면 맨 아래에는 탭 줄이 있다.
 
 ```
-화면 맨 아래 탭 줄:  Output │ Debugger │ Audio │ Animation │ Shader Editor
-                                                 └─ 이것을 클릭한다
+Output   ● Debugger   Audio   ▸ Animation ◂   Shader Editor
+                              └─ 네 번째. 이것을 클릭한다
+```
+
+```
+1. Scene 독에서 AnimationPlayer 를 클릭해 선택 상태로 둔다
+2. 화면 맨 아래 "Animation" 탭을 클릭한다
+3. 패널 왼쪽 위 드롭다운에 애니메이션 6개가 들어 있다
+```
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ [idle ∨]  ⏮ ▶ ⏭  🔁     0.0 ──────────────── 2.03       │ ← 이 드롭다운
+├──────────────────────────────────────────────────────────┤
+│ root/Skeleton3D:mixamorig_Hips       ◆──◆──◆──◆──◆       │
+│ root/Skeleton3D:mixamorig_LeftUpLeg  ◆────◆────◆         │ ← 트랙 23개
+│ root/Skeleton3D:mixamorig_Spine      ◆──◆────◆──◆        │
+└──────────────────────────────────────────────────────────┘
 ```
 
 | 상황 | 대처 |
 |---|---|
-| 탭 줄 자체가 안 보인다 | **뷰포트와 화면 아래 경계선을 위로 드래그**해 패널 높이를 늘린다 |
-| `Animation` 탭이 없다 | `AnimationPlayer` 를 **먼저 선택**해야 탭이 생긴다 |
-| 눌러도 비어 있다 | 선택된 것이 `AnimationPlayer` 가 맞는지 확인(`Skeleton3D` 가 아니다) |
+| 탭 줄이 안 보인다 | 뷰포트와 화면 아래 **경계선을 위로 드래그**해 패널 높이를 늘린다 |
+| `Animation` 탭이 없다 | `AnimationPlayer` 를 **먼저 선택**해야 생긴다 |
+| 눌렀는데 비어 있다 | 고른 것이 `Skeleton3D` 가 아니라 **`AnimationPlayer`** 가 맞는지 |
 
-패널이 열리면 왼쪽 위 드롭다운에서 `walk` 를 고르고 **▶** 를 누른다.
-아래에 **트랙 23개**가 이렇게 늘어선다 — 위 해부가 눈으로 확인되는 순간이다.
+**여기 보이는 트랙 목록이 곧 "뼈의 시간별 자세표" 다.**
+
+#### ② Inspector 맨 첫 줄 — `Current Animation` 드롭다운 (가장 빠르다)
 
 ```
-root/Skeleton3D:mixamorig_Hips          ◆──◆──◆──◆──◆   ← 키프레임 점들
-root/Skeleton3D:mixamorig_LeftUpLeg     ◆────◆────◆
-root/Skeleton3D:mixamorig_Spine         ◆──◆────◆──◆
-…
+Inspector
+  ▣ AnimationPlayer
+     Current Animation    [             ∨ ]   ← 이 빈 칸의 ∨
 ```
 
-#### ③ 실제 게임에서 — ⌘R
+누르면 6개가 그대로 나오고, 고르면 **뷰포트의 캐릭터가 즉시 그 자세로 바뀐다.**
+T-포즈가 풀리면 GLB 가 정상이라는 뜻이다. **재생은 되지 않고 정지 자세만 보인다.**
 
-**에디터는 `_ready()` 를 실행하지 않는다.** 위 두 방법은 어디까지나 **에디터가
-미리보기로 자세를 씌워 주는 것**이고, `play("idle")` 이 실제로 걸리는 것은 실행할 때다.
+#### ③ 씬을 거치지 않고 — **Advanced Import Settings**
+
+**GLB 파일 자체를 들여다본다.** 씬에 올리기 전에도 쓸 수 있다.
+
+```
+1. FileSystem 독에서 <NAME>.glb 를 한 번 클릭
+2. Scene 독 위의 탭 중 "Import" 를 클릭
+3. 패널 아래쪽 "Advanced..." 버튼      ← 엔진 확인된 라벨
+4. "Advanced Import Settings for '<NAME>.glb'" 창이 열린다
+5. 왼쪽 트리에서 애니메이션을 선택하면 오른쪽에 그 애니의 설정이 나온다
+```
+
+**여기서는 애니를 미리보기로 재생할 수 있고, `Loop Mode` 도 바꿀 수 있다.**
+그 이유는 바로 아래 절에 있다.
+
+#### ④ 코드로 찍는다 — 가장 확실하다
+
+**화면에서 못 찾겠을 때 이걸 쓴다.** `_ready()` 끝에 한 줄이면 된다.
+
+```gdscript
+print("애니 목록: ", _anim.get_animation_list())
+# → 애니 목록: ["RESET", "attack", "death", "idle", "run", "walk"]
+```
+
+길이·트랙 수까지 보고 싶으면:
+
+```gdscript
+for n in _anim.get_animation_list():
+    var a := _anim.get_animation(n)
+    print("  %-8s 길이 %.2f초  트랙 %d개  루프 %d" % [n, a.length, a.get_track_count(), a.loop_mode])
+# →   RESET    길이 0.07초  트랙 23개  루프 0
+#     attack   길이 1.30초  트랙 23개  루프 0
+#     death    길이 2.43초  트랙 23개  루프 0
+#     idle     길이 2.03초  트랙 23개  루프 0
+#     run      길이 0.63초  트랙 23개  루프 0
+#     walk     길이 1.40초  트랙 23개  루프 0
+```
+
+**목록이 비어 있으면 코드 문제가 아니라 GLB 문제다.** ⑤ 로 간다.
+
+#### ⑤ 에디터 없이 — 터미널에서 파일을 연다
+
+**Godot 을 켜지 않고 `.glb` 안을 직접 본다.** 별도 라이브러리가 필요 없다.
+
+```bash
+python3 -c "
+import json,struct
+f=open('outputs/<NAME>/<NAME>.glb','rb'); f.read(12)
+n=struct.unpack('<I4s',f.read(8))[0]
+print([a['name'] for a in json.loads(f.read(n))['animations']])"
+```
+
+```
+['idle', 'walk', 'run', 'attack', 'death', 'RESET']
+```
+
+**여기에도 없으면 굽기 단계로 돌아간다** — `verify_godot_glb.py` 를 다시 돌리고,
+`export_godot_glb.py` 의 NLA 분리를 확인한다. Godot 쪽에서 할 수 있는 일이 없다.
+
+---
+
+### 🛑 임포트된 애니는 에디터에서 읽기 전용이다
+
+**애니 패널을 열고 트랙을 고쳐 보려다 막히는 지점이다.**
+Godot 바이너리에 들어 있는 안내 문구가 그대로 설명해 준다(엔진 확인).
+
+```
+Animation is read-only.
+Can't change loop mode on animation instanced from an imported scene.
+To change this animation's loop mode, navigate to the scene's
+Advanced Import settings and select the animation.
+To modify this animation, navigate to the scene's
+Advanced Import settings and select the animation.
+```
+
+**임포트로 만들어진 애니메이션은 `.glb` 에 속한 자원이라 에디터가 편집을 막는다.**
+`.glb` 를 다시 구우면 덮어써질 것이므로, 에디터에서 고쳐 봐야 남지 않기 때문이다.
+
+#### 루프를 켜는 두 가지 길 — 어느 쪽을 쓸 것인가
+
+| | ⓐ Advanced Import Settings | ⓑ 코드 (`_ready()`) |
+|---|---|---|
+| 어디서 | 에디터 → Import 탭 → `Advanced...` | `player_demo.gd` |
+| 저장되는가 | ✅ **`.import` 에 남는다** | 🛑 **남지 않는다.** 실행할 때마다 다시 켠다 |
+| GLB 를 다시 구우면 | `.import` 는 유지된다 | 코드라 영향 없다 |
+| 캐릭터가 늘어나면 | **파일마다 손으로** 해야 한다 | **코드 한 벌로 전부** 처리된다 |
+
+**`player_demo.gd` 는 ⓑ 를 쓴다.** model 스킬이 캐릭터를 계속 구워 내는 구조라
+**파일마다 에디터에서 손으로 켜는 방식은 유지되지 않기 때문**이다.
+
+```gdscript
+# ⓑ — 실행할 때마다 켠다. 임포트 설정을 건드리지 않는다.
+for name in [ANIM_IDLE, ANIM_WALK, ANIM_RUN]:
+    if _anim.has_animation(name):
+        _anim.get_animation(name).loop_mode = Animation.LOOP_LINEAR
+```
+
+**실측 — 코드로는 정말 바뀐다.**
+
+```
+Animation 리소스 경로 : res://exosuit.glb::Animation_2o1u4
+변경 전 loop_mode = 0  →  변경 후 loop_mode = 1        ✅
+walk(1.40초) 를 3초간 재생 → 재생위치 0.200초, is_playing = true
+                             animation_finished 신호 = []   ← 두 바퀴를 돌았다
+```
+
+🔑 **리소스 경로에 `::` 가 들어 있는 것을 눈여겨본다.** `.glb` **안에 들어 있는**
+내장 리소스라는 표시이며, 그래서 **바꿔도 파일에 저장되지 않는다.**
+매번 `_ready()` 에서 다시 켜야 하는 이유가 이것이다.
+
+---
+
+#### 그리고 — 실제 동작은 실행해야 보인다
+
+**에디터는 `_ready()` 를 실행하지 않는다.** 위 ①②③ 은 어디까지나 **에디터가
+미리보기로 자세를 씌워 주는 것**이고, `play("idle")` 이 진짜로 걸리는 것은 실행할 때다.
 "에디터에서는 되는데 실행하면 T-포즈" 라면 그때는 코드 문제다(`_ready()` 의 이름 상수).
 
-| ⚠️ 주의 | |
+| ⚠️ Editable Children 주의 | |
 |---|---|
 | 켜 두면 하위 노드의 변경이 **`player_demo.tscn` 에 저장된다** | 구경만 할 거면 확인 후 **다시 끈다** |
 | GLB 를 다시 구우면 저장해 둔 변경과 **충돌할 수 있다** | 에셋 수정은 Blender 로 돌아가 한다 |
