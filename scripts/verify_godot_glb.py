@@ -159,6 +159,20 @@ def world_bbox(g: dict) -> tuple[list[float], list[float], int, int]:
     return lo, hi, tot_v, tot_t
 
 
+def primitive_tris(g: dict) -> list[dict]:
+    """프리미티브별 삼각형 수. 한 부속이 예산을 독식하는지 보기 위해 쓴다."""
+    acc = g.get("accessors", [])
+    out = []
+    for mi, m in enumerate(g.get("meshes", [])):
+        for pi, p in enumerate(m.get("primitives", [])):
+            if "indices" in p:
+                t = acc[p["indices"]]["count"] // 3
+            else:
+                t = acc[p["attributes"]["POSITION"]]["count"] // 3
+            out.append({"mesh": mi, "prim": pi, "material": p.get("material"), "tris": t})
+    return out
+
+
 def image_size(g: dict, blob: bytes, img: dict) -> tuple[int, int]:
     """PNG/JPEG 헤더에서 해상도를 읽는다. 못 읽으면 (0,0)."""
     bv_idx = img.get("bufferView")
@@ -321,6 +335,26 @@ def main() -> int:
     else:
         fail(f"삼각형 {tris:,} > 예산 {args.tris:,} ({tris / args.tris:.0f}배) "
              f"— Blender Decimate 로 줄인다")
+
+    # 🛑 총합만 보면 놓치는 것 — 한 부속이 예산을 독식해 본체가 뭉개지는 경우.
+    # 실측(2026-09-02 male.glb): 총 4,798 로 예산을 통과했지만 그 안에서 검이
+    # 4,564(95%) 를 먹고 캐릭터 본체는 **234 삼각형**이었다. 규격 LOD0
+    # 3,000~6,000 의 1/20 이라 사람 형체가 나오지 않는다.
+    prims = primitive_tris(g)
+    report["primitives"] = prims
+    if len(prims) > 1:
+        biggest = max(prims, key=lambda p: p["tris"])
+        share = biggest["tris"] / max(tris, 1) * 100
+        if share > 70:
+            fail(f"프리미티브 하나가 삼각형의 {share:.0f}% 를 차지한다 "
+                 f"(mat {biggest['material']}: {biggest['tris']:,} / {tris:,}) "
+                 f"— 나머지가 뭉개졌을 가능성이 높다. "
+                 f"무기·장비를 분리하고 다시 굽는다(--exclude)")
+        else:
+            ok(f"삼각형 분포 정상 (최대 프리미티브 {share:.0f}%)")
+        for p in prims:
+            print(f"       프리미티브 mat={p['material']}: {p['tris']:,} 삼각형 "
+                  f"({p['tris'] / max(tris, 1) * 100:.1f}%)")
 
     # ── 6. 텍스처 ─────────────────────────────────────────────────────────
     images = g.get("images", [])

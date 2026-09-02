@@ -78,7 +78,7 @@ DEFAULT_HEIGHT = 1.8  # 인간형 캐릭터 키(m). 라리엔 PC 기준.
 
 # 삼각형 예산 사다리. 앞으로 갈수록 가볍다.
 # 라리엔 저사양 예산은 LOD0 3,000~6,000 (assets-3d.md §4) 이므로 기본은 4800.
-TRIANGLE_LADDER = (1600, 3200, 4800, 6400, 7200)
+TRIANGLE_LADDER = (1600, 3200, 4800, 6400, 7200, 12000, 20000, 30000)
 DEFAULT_TRIANGLES = 4800
 
 EPS = 1e-6
@@ -94,8 +94,9 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         description="Tripo3D 원본을 Godot 규약(Z-up·1.8m·발바닥 원점)으로 정규화")
     ap.add_argument("input", type=Path, help="입력 .fbx / .glb / .gltf / .obj / .blend")
     ap.add_argument("output", type=Path, help="출력 .blend (새 파일로만 쓴다)")
-    ap.add_argument("--height", type=float, default=DEFAULT_HEIGHT,
-                    help=f"목표 키(m). 기본 {DEFAULT_HEIGHT}")
+    ap.add_argument("--height", type=float, default=None,
+                    help=f"목표 크기(m). 인간형 기본 {DEFAULT_HEIGHT}. "
+                         f"prop 은 명시했을 때만 적용한다(무기 길이 등)")
     ap.add_argument("--kind", default="human",
                     choices=("human", "animal", "drone", "prop"),
                     help="형태. prop 은 키 정규화를 건너뛰고 원점만 맞춘다")
@@ -104,6 +105,11 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
                          f"기본 {DEFAULT_TRIANGLES}. 0 이면 줄이지 않는다")
     ap.add_argument("--rigged", action="store_true",
                     help="이미 리깅된 파일을 고친다(위험 — 리깅 전 실행이 원칙)")
+    ap.add_argument("--exclude", default="",
+                    help="제외할 메시 이름(쉼표 구분). 🛑 무기·장비는 반드시 제외한다 "
+                         "— 캐릭터 메시에 합치면 삼각형 예산을 잡아먹고 교체도 못 한다")
+    ap.add_argument("--only", default="",
+                    help="이 이름의 메시만 남긴다(무기만 따로 뽑을 때). --exclude 와 배타적")
     ap.add_argument("--no-join", action="store_true",
                     help="메시를 합치지 않는다(무기 등 분리 유지가 필요할 때)")
     ap.add_argument("--no-center", action="store_true",
@@ -342,24 +348,68 @@ def decimate_to(meshes: list, budget: int) -> tuple[int, int]:
     if budget <= 0 or before <= budget:
         return before, before
     ensure_object_mode()
+
+    # 🛑 비례 배분을 쓰지 않는다. 원본 폴리곤이 많은 메시에 예산을 더 주면
+    # **가장 조잡한 메시가 예산을 독식**한다. 실측(2026-09-02 male): 검이 원본
+    # 970,514 폴리곤(95%)이라 비례 배분이 예산의 95% 를 검에 주고, 캐릭터 본체는
+    # 234 삼각형으로 뭉개졌다(규격 LOD0 3,000~6,000 의 1/20). 총합만 보는
+    # 검증은 그것을 통과시켰다.
+    #
+    # 대신 **균등 상한**을 쓴다 — 예산을 메시 수로 나눈 몫을 상한으로 두고,
+    # 그보다 작은 메시는 건드리지 않은 뒤 남는 예산을 큰 메시에 되돌린다.
+    counts = {o.name: count_triangles([o]) for o in meshes}
+    n = len(meshes)
+    quota = {}
+    remaining = budget
+    pending = []
     for o in meshes:
-        tris = count_triangles([o])
-        if tris <= 0:
-            continue
-        # 오브젝트별 비례 배분 — 큰 메시를 더 많이 깎는다.
-        share = max(int(budget * tris / before), 8)
-        ratio = min(max(share / tris, 0.0005), 1.0)
-        mod = o.modifiers.new(name="GodotDecimate", type="DECIMATE")
-        mod.decimate_type = "COLLAPSE"
-        mod.ratio = ratio
-        mod.use_collapse_triangulate = True
-        # 🛑 스택 맨 앞으로 옮긴다. ARMATURE 뒤에 두고 적용하면 Blender 가
-        # "Applied modifier was not first, result may not be as expected" 를
-        # 내고 변형된 상태로 구워질 수 있다(--rigged 에서 실측).
-        if len(o.modifiers) > 1:
-            o.modifiers.move(len(o.modifiers) - 1, 0)
+        cap = remaining // max(n, 1)
+        if counts[o.name] <= cap:
+            quota[o.name] = counts[o.name]      # 이미 작다 — 그대로 둔다
+            remaining -= counts[o.name]
+            n -= 1
+        else:
+            pending.append(o)
+    for o in pending:
+        quota[o.name] = max(remaining // max(len(pending), 1), 8)
+
+    # 🛑 한 번에 목표에 도달하지 못한다 — 반복한다.
+    # Decimate(COLLAPSE) 는 극단적으로 낮은 ratio 에서 토폴로지 제약(경계·
+    # non-manifold·UV 심)으로 멈춘다. 실측(2026-09-02 exosuit): 991,844 에
+    # ratio 0.00484 를 걸었는데 4,800 이 아니라 **13,748** 에서 멈췄다(목표의 2.9배).
+    # 남은 초과분에 다시 걸면 수렴한다.
+    MAX_PASSES = 6
+    for _ in range(MAX_PASSES):
+        for o in meshes:
+            tris = count_triangles([o])
+            if tris <= 0 or tris <= quota[o.name]:
+                continue
+            ratio = min(max(quota[o.name] / tris, 0.0005), 1.0)
+            mod = o.modifiers.new(name="GodotDecimate", type="DECIMATE")
+            mod.decimate_type = "COLLAPSE"
+            mod.ratio = ratio
+            mod.use_collapse_triangulate = True
+            # 🛑 스택 맨 앞으로 옮긴다. ARMATURE 뒤에 두고 적용하면 Blender 가
+            # "Applied modifier was not first, result may not be as expected" 를
+            # 내고 변형된 상태로 구워질 수 있다(--rigged 에서 실측).
+            if len(o.modifiers) > 1:
+                o.modifiers.move(len(o.modifiers) - 1, 0)
+            select_only([o])
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+        if count_triangles(meshes) <= budget:
+            break
+
+    # 🛑 Decimate 는 노멀을 뒤집어 놓는다 — 안 고치면 표면에 **검은 얼룩**이 생긴다.
+    # 실측(2026-09-02 exosuit): 재계산 전후로 표면 반점이 눈에 띄게 줄었다.
+    # (다만 노멀이 형상 손실을 되돌리지는 못한다 — 아래 하드 리밋 주석 참조.)
+    for o in meshes:
         select_only([o])
-        bpy.ops.object.modifier_apply(modifier=mod.name)
+        bpy.ops.object.mode_set(mode="EDIT")
+        bpy.ops.mesh.select_all(action="SELECT")
+        bpy.ops.mesh.normals_make_consistent(inside=False)
+        bpy.ops.object.mode_set(mode="OBJECT")
+        o.data.shade_smooth()
+
     after = count_triangles(meshes)
     return before, after
 
@@ -392,6 +442,29 @@ def main() -> int:
         log("[FAIL] 메시가 하나도 없다")
         return 1
     log(f"임포트: 메시 {len(meshes)}개 · 아마추어 {len(arms)}개")
+
+    # ── 무기·장비 분리 ────────────────────────────────────────────────────
+    # 🛑 무기를 캐릭터 메시에 합치면 두 가지가 동시에 깨진다:
+    #   ① 삼각형 예산을 잡아먹어 캐릭터가 뭉개진다(실측: 검이 95% 를 먹고
+    #      캐릭터가 234 삼각형이 됐다)
+    #   ② MMORPG 에서 무기를 교체할 수 없다 — 캐릭터 메시에 구워졌으므로
+    # 무기는 별도 GLB 로 뽑아 BoneAttachment3D 로 손에 붙인다(assets-3d.md §4).
+    if args.exclude and args.only:
+        log("[FAIL] --exclude 와 --only 는 함께 쓸 수 없다")
+        return 1
+    drop_names = {n.strip() for n in args.exclude.split(",") if n.strip()}
+    keep_names = {n.strip() for n in args.only.split(",") if n.strip()}
+    if drop_names or keep_names:
+        victims = [o for o in meshes
+                   if (o.name in drop_names) or (keep_names and o.name not in keep_names)]
+        for o in victims:
+            log(f"메시 제외: {o.name!r} ({len(o.data.polygons):,} 폴리곤)")
+            bpy.data.objects.remove(o, do_unlink=True)
+        meshes = scene_meshes()
+        if not meshes:
+            log("[FAIL] 제외하고 나니 메시가 없다 — 이름을 확인한다")
+            return 1
+        log(f"남은 메시 {len(meshes)}개: {', '.join(o.name for o in meshes)}")
 
     if arms and not args.rigged:
         log("[FAIL] 아마추어가 있다 — 이 파일은 이미 리깅됐다.")
@@ -438,6 +511,25 @@ def main() -> int:
         t_before, t_after = decimate_to(meshes, args.triangles)
         if t_before != t_after:
             log(f"Decimate: 삼각형 {t_before:,} → {t_after:,} (예산 {args.triangles:,})")
+            if t_after > args.triangles * 1.05:
+                # 🛑 Decimate(COLLAPSE) 의 하드 리밋이다. 메시가 **분리된 조각**
+                # (하드서피스 패널·볼트·튜브)으로 되어 있으면 각 조각이 최소
+                # 삼각형 수를 유지해야 해서 그 합 아래로는 못 내려간다.
+                # 실측(exosuit): 991,844 → 13,289 에서 멈춤. Weld·반복·노멀
+                # 재계산을 전부 시도해도 같았고, 그 지점의 형상은 이미 파괴됐다
+                # (얼굴이 사라짐). 🛑 억지로 낮추지 말고 사람에게 보고한다.
+                log(f"[WARN] 예산 {args.triangles:,} 에 도달하지 못했다 — "
+                    f"Decimate 의 하드 리밋({t_after:,})이다.")
+                log("       메시가 분리된 조각으로 되어 있어 그 합 아래로는 줄지 않는다.")
+                log("       🛑 형상이 파괴됐을 수 있으니 **렌더해서 눈으로 확인**하고,")
+                log("          품질이 미달이면 예산을 올리거나 Tripo Retopo 로 재생성한다.")
+            # 🛑 메시별로 찍는다 — 한 메시가 예산을 독식해 다른 메시가 뭉개지는
+            # 사고를 여기서 눈으로 잡는다(총합만 보면 통과해 버린다).
+            for o in meshes:
+                c = count_triangles([o])
+                share = c / max(t_after, 1) * 100
+                mark = "  🛑 예산 독식" if share > 70 and len(meshes) > 1 else ""
+                log(f"    {o.name!r}: {c:,} 삼각형 ({share:.1f}%){mark}")
         else:
             log(f"삼각형 {t_after:,} — 이미 예산 {args.triangles:,} 안이다")
         report["triangles_after_decimate"] = t_after
@@ -450,7 +542,13 @@ def main() -> int:
     # ── 4. 키 맞추기 + 원점을 발바닥으로 ──────────────────────────────────
     lo, hi = world_bbox(meshes)
     h = hi.z - lo.z
-    factor = 1.0 if args.kind == "prop" else args.height / h
+    # prop 은 "키" 개념이 없으므로 기본은 원본 크기를 유지한다. 다만 --height 를
+    # 명시하면 그 길이에 맞춘다 — 무기를 캐릭터에서 분리해 뽑을 때 필요하다
+    # (분리하면 캐릭터 스케일 기준을 잃어 4cm 짜리 검이 나온다. 실측 2026-09-02).
+    if args.kind == "prop":
+        factor = (args.height / h) if args.height else 1.0
+    else:
+        factor = (args.height or DEFAULT_HEIGHT) / h
     targets = meshes + arms
 
     # 🛑 부모를 끊어 이중 적용을 막는다(unparent_keep_transform 주석 참조).
@@ -509,8 +607,9 @@ def main() -> int:
     problems = []
     if abs(lo.z) > 1e-3:
         problems.append(f"발바닥이 원점에서 {lo.z:+.5f} 벗어났다")
-    if args.kind != "prop" and abs(h - args.height) > 1e-3:
-        problems.append(f"키가 {h:.5f} 로 목표 {args.height} 와 다르다")
+    want_h = args.height or (None if args.kind == "prop" else DEFAULT_HEIGHT)
+    if want_h and abs(h - want_h) > 1e-3:
+        problems.append(f"크기가 {h:.5f} 로 목표 {want_h} 와 다르다")
     if args.triangles and tris > args.triangles * 1.05:
         problems.append(f"삼각형 {tris:,} 이 예산 {args.triangles:,} 를 넘는다")
     for o in bpy.data.objects:
