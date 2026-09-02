@@ -6,6 +6,7 @@
 ## 목차
 
 - [명령 사용법](#명령-사용법)
+- [🛑 출력 위치 — `./outputs` 가 기본이다](#-출력-위치--outputs-가-기본이다)
 - [🛑 정규화 규약 — 이 문서의 핵심](#-정규화-규약--이-문서의-핵심)
 - [전체 흐름](#전체-흐름)
 - [① Tripo3D 생성 설정](#-tripo3d-생성-설정)
@@ -37,6 +38,34 @@
 | `--height` | 미터 | 1.8 | 목표 키 |
 | `--texture` | 픽셀 | 1024 | 텍스처 최대 변 |
 | `--name` | 문자열 | 프롬프트에서 추론 | 자산 이름 = 폴더명 |
+| **`--output`** | 폴더 경로 | **`./outputs`** | 🛑 산출물 저장 폴더. **`assets/` 에 쓰지 않는다** |
+
+### 🛑 출력 위치 — `./outputs` 가 기본이다
+
+**모든 산출물은 `./outputs/<NAME>/` 에 저장한다. `assets/` 에 직접 쓰지 않는다.**
+근거와 예외는 [SKILL.md](../SKILL.md) 의 「출력 위치」 절 —
+요약하면 **`assets/` 는 게임 번들이고 무엇을 넣을지는 사람이 고른다.**
+
+```
+outputs/
+├── tripo3d.ai/<NAME>_raw.glb      # ① Tripo 다운로드 원본
+└── <NAME>/
+    ├── <NAME>_norm.blend          # ② 정규화
+    ├── <NAME>_rig.blend           # ③ 리깅
+    ├── <NAME>.glb                 # ④ 최종 산출물 ← Godot 에 넣는 것
+    └── textures/
+```
+
+**`--output` 을 명시하면 그 폴더 아래 `<NAME>/` 로 들어간다** — `--output assets/actor/pc`
+면 `assets/actor/pc/<NAME>/<NAME>.glb`. 🛑 **사람이 지정했을 때만 그렇게 한다.**
+
+> ⚠️ **`--output` 은 `/model` 명령의 옵션이지 스크립트의 플래그가 아니다.**
+> `normalize_for_godot.py` · `export_godot_glb.py` 는 출력 경로를 **두 번째 위치 인자**로
+> 받으므로, `--output` 값은 아래 예시들의 그 자리에 그대로 들어간다. 스크립트를
+> 고칠 일은 없다.
+
+> ℹ️ 프로젝트 루트가 곧 `res://` 라서 `outputs/<NAME>/<NAME>.glb` 도 Godot 이 그대로
+> 임포트한다. **`assets/` 로 옮겨야 쓸 수 있는 것이 아니다.**
 
 ### `--animations` 를 생략하면
 
@@ -131,7 +160,7 @@ GLB 를 고쳐 1.8m 로 만듦 (근본 해결)
         ↓ <NAME>_rig.blend
 ④ export_godot_glb.py --animations --bones
         ↓ 애니 적용 → 본 감축(베이크) → 텍스처 리사이즈 → GLB
-        ↓ <NAME>.glb
+        ↓ outputs/<NAME>/<NAME>.glb   ← 🛑 기본 출력. assets/ 에 쓰지 않는다
 ⑤ verify_godot_glb.py        ← 🛑 완료 게이트. 종료 0 이 아니면 넣지 않는다
         ↓
 ⑥ Godot 임포트 설정 (root_scale=1.0)
@@ -193,7 +222,7 @@ STL 뿐이고, **Godot 은 glTF(`.glb`)를 네이티브 1급으로 지원**하�
 ```bash
 blender --background --python .claude/skills/model/scripts/normalize_for_godot.py -- \
   outputs/tripo3d.ai/<NAME>_raw.fbx \
-  game-assets/actor/pc/<NAME>/<NAME>_norm.blend \
+  outputs/<NAME>/<NAME>_norm.blend \
   --kind human --height 1.8 --triangles 4800
 echo "종료코드=$?"    # 0 = 통과
 ```
@@ -237,11 +266,11 @@ echo "종료코드=$?"    # 0 = 통과
 ```bash
 # 캐릭터 — 무기를 빼고 예산 전부를 몸에 쓴다
 blender --background --python .../normalize_for_godot.py -- \
-  <입력> <NAME>_norm.blend --kind human --triangles 4800 --exclude weapon
+  <입력> outputs/<NAME>/<NAME>_norm.blend --kind human --triangles 4800 --exclude weapon
 
 # 무기 — 따로 뽑는다. prop 은 --height 를 줘야 크기가 맞는다
 blender --background --python .../normalize_for_godot.py -- \
-  <입력> sword_norm.blend --kind prop --triangles 1600 \
+  <입력> outputs/sword/sword_norm.blend --kind prop --triangles 1600 \
   --only weapon --height 1.0 --no-center
 ```
 
@@ -300,8 +329,8 @@ GUI Blender 가 반드시 필요하다** — 이것이 ④ 가 "유일한 GUI �
 
 ```bash
 blender --background --python .claude/skills/model/scripts/export_godot_glb.py -- \
-  game-assets/actor/pc/<NAME>/<NAME>_rig.blend \
-  assets/actor/pc/<NAME>/<NAME>.glb \
+  outputs/<NAME>/<NAME>_rig.blend \
+  outputs/<NAME>/<NAME>.glb \
   --animations game-assets/animations/default \
   --kind human --bones 16 --texture 1024
 echo "종료코드=$?"
@@ -333,7 +362,7 @@ Godot 의 애니메이션 블렌딩은 **RESET 을 기준 포즈로 전제**한�
 
 ```bash
 python3 .claude/skills/model/scripts/verify_godot_glb.py \
-  assets/actor/pc/<NAME>/<NAME>.glb --bones 16 --kind human
+  outputs/<NAME>/<NAME>.glb --bones 16 --kind human
 echo "종료코드=$?"    # 🛑 0 이 아니면 Godot 에 넣지 않는다
 ```
 

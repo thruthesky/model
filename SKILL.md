@@ -1,6 +1,6 @@
 ---
 name: model
-description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인**이다(원저자 2026-08-07). 원시 도형(box·sphere·cylinder·cone)을 조합해 캐릭터·몬스터·무기의 형상을 흉내내지 않는다 — 2026-08-07 에 몬스터가 "구슬+막대기", 무기가 "ㄱ 자 조각" 으로 나와 실패로 판명됐고, 같은 화면의 GLB 캐릭터만 AAA 급이었다. "임시로 도형으로 대신하자" 는 제안 자체를 하지 않는다. 형상이 필요하면 반드시 이 파이프라인을 탄다. **🛑 Godot 3D 프로젝트면 references/godot-pipeline.md 로 간다** — `/model --bones 16 --kind human --triangles 4800 --animations <폴더> "<프롬프트>"` 형식으로 Tripo3D 생성 → **리깅 전 정규화(키 1.8m·발바닥 원점·Z-up·scale 1)** → ARP 리깅 → Mixamo 애니 적용 → **본 감축(16 또는 25, 기본 16)** → 텍스처 1024 → `.glb` 로 내보내 Godot 에 바로 넣는다. 【Godot 관련 요청】"godot 용 모델 만들어줘", "glb 로 내보내줘", "본 16개로 줄여줘", "삼각형 줄여줘", "저사양용 캐릭터", **"모델이 Godot 에디터에 안 보여요"**, "캐릭터가 화면에 없어요", "모델이 너무 크다/작다", "원점이 머리 위에 있다", "발이 지면에 안 닿는다", "root_scale", "스케일이 이중 적용", "캐릭터가 누워 있다", "T-포즈로 안 움직인다", "애니메이션이 하나만 나온다" — 원인은 대부분 **Tripo 메시(Y-up·1.0)와 Mixamo 리그(Z-up·cm)의 좌표계 혼재**이고, 그것을 `.import` 의 root_scale 로 덮으면 더 크게 터진다. 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【다리 모으기】"다리 모아줘", "다리가 벌어졌어", "양다리·무릎·발 붙여줘", "다리 벌어진 것 고쳐줘", "close legs", "차렷 자세로", "팔자 다리 고쳐줘" — pc/mob 의 다리가 벌어져 있으면 재생성하지 않고 Blender 에서 rest pose 를 고쳐 모은다(⑤-L, 벌어진 모델은 지시 없이도 자동 적용). 【동물형(비인간형)】"거미 몬스터 만들어줘", "지네/고질라/네발 짐승 만들어줘", "동물형 몬스터", "다족 몬스터", "사람 모양이 아닌 몬스터", "비인간형 리깅", "거미처럼 기어다니는 애니메이션" — Mixamo 에 해당 애니가 없고 ARP Smart 도 humanoid 전용이라 경로가 완전히 다르다(8방향·idle/walk/attack/death 4행동·128 cell, `outputs/` 저장). 상세는 references/non-humanoid.md. 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
+description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인**이다(원저자 2026-08-07). 원시 도형(box·sphere·cylinder·cone)을 조합해 캐릭터·몬스터·무기의 형상을 흉내내지 않는다 — 2026-08-07 에 몬스터가 "구슬+막대기", 무기가 "ㄱ 자 조각" 으로 나와 실패로 판명됐고, 같은 화면의 GLB 캐릭터만 AAA 급이었다. "임시로 도형으로 대신하자" 는 제안 자체를 하지 않는다. 형상이 필요하면 반드시 이 파이프라인을 탄다. **🛑 산출물은 기본으로 `./outputs` 에 저장한다 — `assets/`(게임 번들)에는 쓰지 않으며, 사람이 `--output <경로>` 로 명시했을 때만 그곳에 쓴다.** **🛑 Godot 3D 프로젝트면 references/godot-pipeline.md 로 간다** — `/model --bones 16 --kind human --triangles 4800 --animations <폴더> "<프롬프트>"` 형식으로 Tripo3D 생성 → **리깅 전 정규화(키 1.8m·발바닥 원점·Z-up·scale 1)** → ARP 리깅 → Mixamo 애니 적용 → **본 감축(16 또는 25, 기본 16)** → 텍스처 1024 → `.glb` 로 내보내 Godot 에 바로 넣는다. 【Godot 관련 요청】"godot 용 모델 만들어줘", "glb 로 내보내줘", "본 16개로 줄여줘", "삼각형 줄여줘", "저사양용 캐릭터", **"모델이 Godot 에디터에 안 보여요"**, "캐릭터가 화면에 없어요", "모델이 너무 크다/작다", "원점이 머리 위에 있다", "발이 지면에 안 닿는다", "root_scale", "스케일이 이중 적용", "캐릭터가 누워 있다", "T-포즈로 안 움직인다", "애니메이션이 하나만 나온다" — 원인은 대부분 **Tripo 메시(Y-up·1.0)와 Mixamo 리그(Z-up·cm)의 좌표계 혼재**이고, 그것을 `.import` 의 root_scale 로 덮으면 더 크게 터진다. 3D 캐릭터를 만들어 **두 단계로 나눠** 쓴다 — **Phase A(3D)**: Tripo3D(tripo3d.ai) 텍스트→3D 생성 → 리깅 없이 다운로드 → Blender Auto-Rig Pro 리깅(mixamorig:* 규격 본) → Mixamo 애니메이션(idle·walk·run·attack·death) 적용 → 애니가 들어간 `<NAME>.blend` 완성. **Phase B(2.5D)**: 그 `.blend` 를 texture-packer 의 sheet.py 로 16방향 5행동 packed atlas(`.png`+`.atlas`, Flame flame_texturepacker)로 굽는다. **A 만 돌리고 멈춰도 되고, 이미 있는 `.blend` 로 B 만 돌려도 된다.** 다음 요청에 사용할 것 — 【전체】"3d 모델 만들어줘", "캐릭터 생성", "tripo 로 모델 뽑아줘", "몬스터/사람/로봇 3D 모델 만들어줘", "우주복/개척자/NPC 모델", "도형 대신 캐릭터 그림 넣어줘". 【Phase A 만】"3D 모델만 만들어줘", "스프라이트 말고 3d 모델로", "리깅해줘", "auto rig", "Auto-Rig Pro 로 리깅", "Mixamo 본 붙여줘", "mixamo 애니메이션 적용", "걷기/공격 모션 넣어줘", "리깅 결과를 Blender 로 보여줘", "무기 붙일 3d 원본 만들어줘". 【다리 모으기】"다리 모아줘", "다리가 벌어졌어", "양다리·무릎·발 붙여줘", "다리 벌어진 것 고쳐줘", "close legs", "차렷 자세로", "팔자 다리 고쳐줘" — pc/mob 의 다리가 벌어져 있으면 재생성하지 않고 Blender 에서 rest pose 를 고쳐 모은다(⑤-L, 벌어진 모델은 지시 없이도 자동 적용). 【동물형(비인간형)】"거미 몬스터 만들어줘", "지네/고질라/네발 짐승 만들어줘", "동물형 몬스터", "다족 몬스터", "사람 모양이 아닌 몬스터", "비인간형 리깅", "거미처럼 기어다니는 애니메이션" — Mixamo 에 해당 애니가 없고 ARP Smart 도 humanoid 전용이라 경로가 완전히 다르다(8방향·idle/walk/attack/death 4행동·128 cell, `outputs/` 저장). 상세는 references/non-humanoid.md. 【Phase B 만】"이 blend 를 스프라이트로 구워줘", "16방향 아틀라스 만들어줘", "texture pack 해줘", "2.5d 로 구워줘", "프레임 수 바꿔서 다시 구워줘". 텍스트→3D 생성, ARP 오토 리깅, ARP→Mixamo 본 이름 rename, 리그 검증, rest pose 보정, 16방향 5행동 texture-pack 전 과정과 두 단계 사이의 인계 계약을 다룬다.
 ---
 
 # 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 AAA 급 모델 디자인이다**
@@ -96,6 +96,44 @@ description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 A
 | `--animations` | 폴더 경로 | **없음** | Mixamo `.fbx` 폴더 |
 | `--height` | 미터 | 1.8 | 목표 키 |
 | `--texture` | 픽셀 | 1024 | 텍스처 최대 변 |
+| **`--output`** | 폴더 경로 | **`./outputs`** | 🛑 산출물 저장 폴더. **`assets/` 에 쓰지 않는다** |
+
+### 🛑 출력 위치 — 기본은 `./outputs` 다. `assets/` 에 저장하지 않는다 〔두 경로 공통〕
+
+**이 스킬이 만드는 모든 산출물은 기본으로 프로젝트 루트의 `./outputs/` 에 저장한다.**
+
+| | 경로 | 무엇 |
+|---|---|---|
+| ✅ **기본 출력** | **`./outputs/<NAME>/`** | 🛑 지시가 없으면 **언제나 여기** |
+| 🛑 **금지** | `assets/…` | **게임 번들이다.** 무엇을 넣을지는 **사람이 고른다** |
+| ⭕ 예외 | 사람이 `--output` 으로 **명시한 경로** | 그때만 그곳에 쓴다 |
+
+**왜 — `assets/` 는 "게임에 실제로 들어가는 것" 의 목록이다.** 파이프라인이 거기에
+직접 쓰면 **검증 전의 후보물과 채택된 자산이 섞이고**, 되돌릴 때 무엇이 원래 있던
+것인지 알 수 없게 된다. **굽는 것과 채택하는 것은 다른 판단**이며, 채택은 사람의 몫이다.
+
+```
+outputs/
+├── tripo3d.ai/<NAME>_raw.glb      # ① Tripo 다운로드 원본
+└── <NAME>/                        # ← --output 아래 자산 이름으로 한 폴더
+    ├── <NAME>_norm.blend          # ② 정규화
+    ├── <NAME>_rig.blend           # ③ 리깅
+    ├── <NAME>.glb                 # ④ 최종 산출물
+    └── textures/
+```
+
+**다른 곳에 넣으려면 사람이 명시적으로 지정한다:**
+
+```
+/model --output assets/actor/pc "<프롬프트>"
+```
+
+🛑 **지시가 없는데 스스로 `assets/` 를 고르지 않는다.** "어차피 게임에 넣을 거니까" 는
+이유가 되지 않는다. **`--output` 이 없으면 `./outputs` 이고, 예외는 없다.**
+
+> ℹ️ **Godot 에서는 `outputs/` 도 그대로 쓸 수 있다.** 프로젝트 루트가 곧 `res://` 라서
+> `outputs/<NAME>/<NAME>.glb` 는 `res://outputs/…` 로 임포트되고 씬에 바로 끌어다 놓을 수
+> 있다. **`assets/` 에 넣어야만 쓸 수 있는 것이 아니다.**
 
 🛑 **`--animations` 가 없으면 "애니메이션을 적용하지 않습니다" 를 알리고 정적 모델로
 진행한다.** 작업을 멈추지 않되, **끝난 뒤 한 번 더** 폴더를 지정해 달라고 말한다.
@@ -418,7 +456,8 @@ unzip -o outputs/tripo3d.ai/"<이름>_raw.zip" -d "$DST"
   && mv tripo_convert_*.fbm  ${NAME}_raw.fbm )   # 텍스처 폴더. FBX 와 같은 이름이어야 로드된다
 ```
 
-**`<NAME>` 이 곧 자산 이름이자 아틀라스 이름이다** — `assets/pc/<NAME>/<NAME>.atlas` 가 된다.
+**`<NAME>` 이 곧 자산 이름이자 아틀라스 이름이다** — `outputs/pc/<NAME>/<NAME>.atlas` 가 된다
+(`--output ./outputs` 기준. 🛑 `assets/` 에 굽지 않는다).
 사람이 읽을 이름을 붙일 것(`colonist`·`denis`·`maria`).
 
 ⚠️ **성별로 나누지 않는다.** 폴더 이름이 캐릭터 종류다 — 캐릭터마다 폴더를 하나 만든다
@@ -849,7 +888,7 @@ blender --background --python .claude/skills/model/scripts/retarget_to_arp_rig.p
 | **`--animations built-in`** | 생략하면 모델 폴더 → `animations/<NAME>/` → `default` 순으로 자동 탐색해 **원본 Mixamo fbx** 를 집는다 → ⑦ 의 보정이 무시돼 **팔 만세 재현** | 🛑 **진짜 조용한 실패.** Phase B 단독 실행 시 반드시 명시 |
 | **`--kind`** | 비대화형에서 누락하면 **명시적으로 종료**하고, 대화형이면 물어본다. 위험은 *누락* 이 아니라 **틀린 값** — kind 하나가 방향·셀·표시크기·행동을 전부 정한다(`sheet.py` `KIND_POLICY`) | 🛑 `boss`/`minion`(8방향)을 16방향으로 굽는 것은 **명시된 회귀** |
 | `--name` | 생략하면 **모델 파일 이름**으로 기본화된다. 폴더명 = 아틀라스 이름 = 런타임 조회 키 | ⚠️ 파일명과 자산 이름이 같으면 안전 |
-| `--output` | 생략 = 프로젝트 `assets/` + `pubspec.yaml` 자동 등록 / 지정 = 그 폴더에만 저장(pubspec 손대지 않음) | ⚠️ 실패가 아니라 **정책 선택** — "후보만 굽기" 인지 "게임에 넣기" 인지 고른다 |
+| **`--output`** | 🛑 **기본은 `./outputs`** — 반드시 `--output ./outputs` 를 준다. 생략하면 `sheet.py` 가 프로젝트 `assets/` 에 굽고 `pubspec.yaml` 까지 자동 등록한다 | 🛑 **생략이 곧 `assets/` 오염이다.** 게임에 넣는 것은 사람이 고른다 — 지시가 있을 때만 다른 경로를 준다 |
 
 🛑 **경로 추론은 프로젝트 트리 안에서만 된다.** `sheet.py` 의 `infer_kind_name_from_path()` 는
 `characters/<kind>/…` 형태에서만 kind·name 을 뽑고 **프로젝트 루트 밖 경로는 추론을 거부**한다.
@@ -868,8 +907,11 @@ SSOT 는 거기이며, 이 절은 호출 방법과 함정만 적는다.**
 ```bash
 python3 .claude/skills/texture-packer/scripts/sheet.py \
   ./game-assets/characters/pc/<중간>/<NAME>/<NAME>.blend \
-  --animations built-in --auto
+  --animations built-in --auto --output ./outputs
 ```
+
+🛑 **`--output ./outputs` 를 빼지 않는다.** 빼면 `sheet.py` 가 `assets/` 에 굽고
+`pubspec.yaml` 에 자동 등록까지 한다 — **검증도 전에 게임 번들에 들어간다.**
 
 액션 이름이 `idle`/`walk`/`run`/`attack`/`death` 라 `match_embedded` 가 정확 매칭한다
 (`_sheet_render.py:489`). 로그에 **`애니 소스 : 캐릭터 내장(built-in)`** 이 찍히는지 볼 것.
@@ -880,7 +922,7 @@ python3 .claude/skills/texture-packer/scripts/sheet.py \
 ```bash
 python3 .claude/skills/texture-packer/scripts/sheet.py \
   ./game-assets/characters/pc/<중간>/<NAME>/<NAME>.fbx \
-  --animations default --auto
+  --animations default --auto --output ./outputs
 ```
 ARP 리그에는 쓸 수 없다 — 팔이 만세로 나온다(⑦ 참조).
 </details>
@@ -916,7 +958,7 @@ ARP 리그에는 쓸 수 없다 — 팔이 만세로 나온다(⑦ 참조).
 | 셀 | 128px |
 | 행동·프레임 | **pc** `idle 8` · `walk 12` · `attack 16` · `death 8` · `run 12` = 56프레임<br>**몬스터(mob·boss·minion)** `idle 8` · `walk 12` · `attack 10` · `death 6` = **36프레임**(2026-08-12 `MONSTER_FRAMES`) |
 | 총 셀 | pc 56 × 16 = **896** · mob 36 × 16 = **576** · boss/minion 36 × 8 = **288** |
-| 산출 | `assets/pc/<NAME>/<NAME>.png` + `.atlas` (+ `--output` 미지정 시 `pubspec.yaml` 자동 등록) |
+| 산출 | **`outputs/<kind>/<NAME>/<NAME>.png` + `.atlas`** (`--output ./outputs` 기준) |
 
 > 🛑 **몬스터는 pc 보다 적게 굽는다** — atlas RAM ≈ page W×H×4 라 셀 수 감축이 그대로 RAM 감축이고
 > (65종 실측 1112→899MB, −19.2%), **화질 손실은 0**. 재생 속도는 클라가 흡수한다
@@ -956,7 +998,7 @@ ARP 리그에는 쓸 수 없다 — 팔이 만세로 나온다(⑦ 참조).
 python3 .claude/skills/texture-packer/scripts/verify_cells.py --frames outputs/<NAME>/frames
 ```
 
-그리고 `assets/pc/<NAME>/<NAME>.png` 을 **Read 로 열어** 확인한다 — 여기부터는 자동화할
+그리고 `outputs/pc/<NAME>/<NAME>.png` 을 **Read 로 열어** 확인한다 — 여기부터는 자동화할
 수 없다:
 
 - 5행동이 모두 **다른 포즈**인가 (전부 같으면 애니메이션이 안 붙은 것 → ⑥⑦ 재실행)
@@ -979,7 +1021,8 @@ hot reload 로 안 잡힌다) 확인한다.
    `####WARN … 정적` **0줄**
 3. `verify_cells --frames` 종료 코드 0 (또는 auto-fit 수렴 로그로 잘림 0)
 4. 압축 로그에 `⚠️ 압축 실패` 없음
-5. 산출 위치와 `pubspec.yaml` 등록 여부가 의도와 일치한다
+5. 산출 위치가 **`outputs/` 안**이다 — `assets/` 에 쓰였다면 그 자체가 실패다
+   (사람이 `--output` 으로 지정한 경우만 예외). `pubspec.yaml` 이 건드려지지 않았는지도 본다
 6. 낱장 프레임 몽타주를 **눈으로** 확인했다(위 5항목)
 7. **움직임을 봤다** — 뷰어 또는 앱 재빌드 후 로드
 8. 🛑 여기까지 통과해도 **게임 화면에 새 캐릭터로 등장하는 것은 별개**다 → 다음 절
@@ -1040,7 +1083,7 @@ game-assets/characters/pc/<중간>/<NAME>/        # <중간> 은 분류용 — s
 ├── <NAME>.blend        # ⑦ rest pose 보정 + 액션 5종 ← **Phase A 계약물 · Phase B 입력**
 └── <NAME>_rig.blend    # ARP 리그 원본(컨트롤러 포함) — 재리깅용으로 반드시 남긴다
 
-assets/pc/<NAME>/
+outputs/pc/<NAME>/          # 🛑 기본 출력. assets/ 로 옮기는 것은 사람의 판단이다
 ├── <NAME>.png          # ⑧ packed atlas
 └── <NAME>.atlas        # flame_texturepacker 메타 (+ laryen.actionScale.* 헤더)
 ```
