@@ -77,7 +77,7 @@ description: 🛑 제0원칙 — 사람 개발자가 원하는 것은 **오직 A
 | 대상 | 산출물 | 문서 |
 |---|---|---|
 | **Godot 3D** (라리엔 3D) | **`<NAME>.glb`** — Godot 에 바로 넣는다 | 🛑 **[references/godot-pipeline.md](references/godot-pipeline.md)** |
-| ↳ 그 GLB 를 **씬에 올려 움직이기** | 이동·애니·버튼 데모 씬 | **[references/godot-scene.md](references/godot-scene.md)** |
+| ↳ 그 GLB 를 **씬에 올려 움직이기** | 데모 씬 + **임포트 해부·애니 원리**(4.7.2 실측) | **[references/godot-scene.md](references/godot-scene.md)** |
 | ↳ **문제가 생겼을 때 / 처음 만들 때** | 🛑 **겪은 사고 전부 + 정답 순서** | **[references/troubleshooting.md](references/troubleshooting.md)** |
 | Flutter/Flame 2.5D (구 라리엔) | `<NAME>.png` + `.atlas` — 16방향 스프라이트 | **이 문서** 아래 전체 |
 
