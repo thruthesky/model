@@ -108,12 +108,31 @@ def measure_markers(mesh) -> dict:
         seg[min(int(t * m), m - 1)].append(v)
     thick = [(max(p.z for p in s) - min(p.z for p in s)) if len(s) > 4 else 0.0
              for s in seg]
-    wrist_i = m - 1
+    # 🛑 폴백을 m-1(팔 최끝단)로 두면 마커가 메시 경계에 놓여 ARP 가
+    #    'Could not find wrist front, marker out of mesh' 로 감지를 통째로 포기한다.
+    #    메카·로봇처럼 팔이 균일한 각진 블록이면 두께 급감이 없어 반드시 이 폴백을 탄다.
+    #    안쪽 82% 로 두면 어느 형상에서도 마커가 메시 안에 들어온다.
+    #    (2026-09-02 mecath 실측 — m-1 일 때 x 0.940 / 메시 경계 0.956 이라 실패)
+    wrist_i = int(m * 0.82)
     for i in range(int(m * 0.55), m - 1):
         if thick[i] > 0 and thick[i + 1] > 0 and thick[i + 1] < thick[i] * 0.86:
             wrist_i = i
             break
     wrist_x = torso + (wrist_i + 0.5) / m * (tip - torso)
+
+    # 🛑 hand 의 y·z 를 shoulder 와 같은 값(arm_y·arm_z)으로 두지 않는다.
+    #    팔이 조금만 기울거나 앞뒤로 휘면 마커가 팔 단면 밖으로 나가고, ARP 는
+    #    'Could not find wrist front, marker out of mesh' 로 감지를 통째로 포기한다.
+    #    실측(2026-09-02 mecath) — 어깨 패드가 커서 arm_z 중앙값이 1.539 로 잡혔는데
+    #    손목 x=0.82 의 실제 팔 단면은 z 1.366~1.473 이라 7cm 밖이었다.
+    #    손목 x 지점의 단면에서 다시 잰다.
+    wsec = [v for v in vs
+            if abs(abs(v.x) - wrist_x) < max(tip - torso, 1e-6) * 0.08]
+    if len(wsec) >= 4:
+        wrist_y = (min(v.y for v in wsec) + max(v.y for v in wsec)) / 2
+        wrist_z = (min(v.z for v in wsec) + max(v.z for v in wsec)) / 2
+    else:
+        wrist_y, wrist_z = arm_y, arm_z
 
     # 목 — 어깨 위에서 |x|max 최소
     cand = [(xmax(i), i) for i in range(arm_hi + 1, int(n * 0.93)) if bands[i]]
@@ -144,7 +163,7 @@ def measure_markers(mesh) -> dict:
         "neck": [0.0, round(ycenter(neck_i), 4), round(zcenter(neck_i), 4)],
         "chin": [0.0, round(chin_y, 4), round(zcenter(chin_i), 4)],
         "shoulder": [round(torso * 0.85, 4), round(arm_y, 4), round(arm_z, 4)],
-        "hand": [round(wrist_x, 4), round(arm_y, 4), round(arm_z, 4)],
+        "hand": [round(wrist_x, 4), round(wrist_y, 4), round(wrist_z, 4)],
         "root": [0.0, round(ycenter(crotch), 4), round(root_z, 4)],
         "foot": [round(foot_x, 4), round(foot_y, 4), round(zmin + height * 0.055, 4)],
     }

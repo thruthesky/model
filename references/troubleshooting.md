@@ -29,13 +29,16 @@
 NAME=<이름>
 
 # ① Tripo3D — Format **GLB** · Texture **2K** · Ultra Mesh **OFF** · T-Pose **ON**
+#    🛑 Geometry & Texture → Topology **Triangle** · Polycount **1600** 을 여기서 정한다
+#       (받은 뒤로는 폴리곤에 손대지 않는다 → godot-pipeline.md 「폴리곤은 받은 그대로 쓴다」)
 #    프롬프트에 "legs together, feet touching, arms straight out horizontally" 를 넣는다
 mv ~/Downloads/${NAME}_raw.glb outputs/tripo3d.ai/
 
 # ② 정규화 — 🛑 리깅 **전에**. 정면은 -Y 그대로 둔다(ARP 규약)
+#    🛑 --triangles 0 — 폴리곤을 조절하지 않는다. 사람이 숫자를 지시했을 때만 그 값을 준다
 blender --background --python .claude/skills/model/scripts/normalize_for_godot.py -- \
   outputs/tripo3d.ai/${NAME}_raw.glb outputs/${NAME}/${NAME}_norm.blend \
-  --kind human --height 1.8 --triangles 20000
+  --kind human --height 1.8 --triangles 0
 
 # ③ ARP 자동 리깅 — 🛑 --background 를 붙이지 않는다(창이 뜨지만 알아서 닫힌다)
 blender outputs/${NAME}/${NAME}_norm.blend \
@@ -57,7 +60,7 @@ blender --background --python .claude/skills/model/scripts/export_godot_glb.py -
 
 # ⑦ 완료 게이트 — 🛑 종료 0 이 아니면 Godot 에 넣지 않는다
 python3 .claude/skills/model/scripts/verify_godot_glb.py \
-  outputs/${NAME}/${NAME}.glb --bones 25 --kind human --tris 20000
+  outputs/${NAME}/${NAME}.glb --bones 16 --kind human --tris 1600
 ```
 
 ### 🛑 순서를 바꾸면 안 되는 세 곳

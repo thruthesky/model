@@ -651,6 +651,15 @@ so it can't be assigned to an object of type: 'Node3D'
 | 노드 | 속성 | 값 |
 |---|---|---|
 | `Ground` | Size / Position / **Use Collision** | `(20,1,20)` / `(0,-0.5,0)` / **ON** |
+
+> 🛑 **`Ground` 의 `CSGBox3D` 는 데모 전용이다.** CSG 는 불리언 연산을 CPU 에서 하고,
+> 라리엔의 **조명 굽기(SSOT §2)·드로우콜 병합(§3)** 이 둘 다 성립하지 않는다.
+> 데모 씬은 빌드에 넣지 않으므로 그대로 둬도 된다.
+>
+> ✅ **다만 CSG 를 버릴 필요는 없다** — `bake_static_mesh()` 로 구우면 평범한
+> `MeshInstance3D` 가 되어 **런타임 불리언 연산이 사라지고 오히려 빨라진다.**
+> 형상은 그대로 유지된다. 출시 맵에 남기면 안 되는 것은 **CSG 노드 그대로**이지
+> 그 형상이 아니다(SSOT §3.0).
 | `CollisionShape3D` | Shape / Position | **CapsuleShape3D** (Height `1.8`, Radius `0.3`) / `(0, 0.9, 0)` |
 | **`<NAME>` (GLB 인스턴스)** | **Position** | 🛑 **`(0, 0, 0)`** — 원점이 **발바닥**이라 올리면 뜬다 |
 | `Camera3D` | **Projection** | **Orthogonal** 🛑 SSOT §1 |
