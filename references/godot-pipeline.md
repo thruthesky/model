@@ -209,6 +209,8 @@ Blender +Y 가 그대로 −Z 가 된다. **포맷이 다르면 규약도 다르
         ↓ <NAME>_norm.blend
 ③ 리깅 (ARP Smart → Match to Rig → Bind)   ← 유일한 GUI 단계
         ↓ <NAME>_rig.blend
+③-T align_tpose.py --check-only   ← 🛑 human 형 필수. T-포즈가 아니면 정렬한다
+        ↓ <NAME>_tpose.blend
 ④ export_godot_glb.py --animations --bones
         ↓ 애니 적용 → 본 감축(베이크) → 텍스처 리사이즈 → GLB
         ↓ outputs/<NAME>/<NAME>.glb   ← 🛑 기본 출력. assets/ 에 쓰지 않는다
@@ -222,6 +224,7 @@ Blender +Y 가 그대로 −Z 가 된다. **포맷이 다르면 규약도 다르
 | 순서 | 바꾸면 |
 |---|---|
 | **정규화 → 리깅** | 리깅 후 스케일을 바꾸면 본 길이와 액션 위치 키가 어긋난다 |
+| 🛑 **리깅 → T-포즈 정렬 → 애니** | 리깅 전엔 본이 없어 자세를 못 바꾸고, 애니 뒤엔 액션이 이미 구워져 늦다. **A-포즈 rest 에 애니를 붙이면 팔이 몸통을 관통한다**(③-T) |
 | **애니 적용 → 본 감축** | 감축을 먼저 하면 Mixamo 의 어깨·목 트랙이 갈 곳을 잃어 **그 회전이 사라진다.** 뒤에 하면 베이크가 팔·머리로 흡수한다 |
 | **리깅·애니 → 정면 교정** | 🛑 교정을 먼저 하면 ARP 가 뒤통수를 얼굴로 착각해 **몸통·머리 본만 반대로** 심는다(다리는 정상이라 티가 안 난다) |
 
@@ -538,6 +541,59 @@ AI 배치를 못 쓰므로 6개 마커를 직접 잰다. **표를 베끼지 말�
 
 🛑 **`chin` 은 정면 쪽이어야 한다.** 정규화가 정면을 **+Y** 로 맞추므로 `max(y)` 로 잡는다.
 `min(y)` 로 잡으면 뒤통수에 놓여 **머리 본이 뒤를 향한다**(실측으로 겪었다).
+
+### 🛑 마커 자동 실측이 실패하는 경우 — 팔이 감지되지 않는다
+
+`arp_autorig.py` 의 `measure_markers()` 는 팔을 **`|x| > 몸통폭 × 1.8`** 인 밴드로 찾는다.
+**어깨가 넓은 메카·중장갑 캐릭터는 그 비를 넘지 못해 `arm = []` 로 폴백**하고,
+`tip = torso × 3` 이 **메시 바깥 좌표**를 만든다.
+
+실측(2026-09-04 `scrap`) — 몸통폭 0.6606 · 최대 `|x|` 0.7302 인데 임계가 1.189 라
+팔 감지에 실패하고 `hand` 마커가 **x = 1.7342**(메시 밖)로 나왔다. 결과는 오류가 아니라
+**길이 11cm 짜리 팔 본**이었다 — 조용히 잘못된 리그가 만들어진다.
+
+**징후와 대처**
+
+| 징후 | 뜻 |
+|---|---|
+| 로그의 `marker hand` 가 **메시 bbox 밖** | 팔 감지 실패. 마커를 실측해 직접 준다 |
+| `Could not find shoulder, marker out of mesh?` | ARP 는 마커의 **(x, z)에서 Y축으로 레이캐스트**해 판정한다 — 마커가 **정면 실루엣 안**에 있어야 한다. 몸통과 팔 사이가 빈 메카는 그 틈에 마커가 떨어지기 쉽다 |
+
+**마커 유효 영역은 (x, z) 적중 맵으로 찾는다** — Y 값은 판정에 쓰이지 않는다:
+
+```python
+# (x, z) 에서 -Y 뒤로 물러나 +Y 로 쏜다. 맞으면 마커를 놓을 수 있다.
+ok, loc, nor, idx = mesh.ray_cast(Vector((x, -D*2, z)), Vector((0, 1, 0)), distance=D*4)
+```
+
+---
+
+## ③-T 🛑 T-포즈 정렬 — `align_tpose.py` (human 형 필수)
+
+> # 인간형이 T-포즈가 아니면 **여기서 반드시 T-포즈로 바꾼다.**
+> 〔원저자 지시 2026-09-04〕 건너뛰면 ⑦ 리타게팅이 **예외 없이** 무너진다.
+
+```bash
+# 판정 — 종료 0 이면 T-포즈, 1 이면 아니다
+blender --background --python .claude/skills/model/scripts/align_tpose.py -- \
+  outputs/<NAME>/<NAME>_mixamo.fbx game-assets/animations/default/idle.fbx --check-only
+
+# 정렬 — 리그와 메시를 함께 T-포즈로 굳힌다
+blender --background --python .claude/skills/model/scripts/align_tpose.py -- \
+  outputs/<NAME>/<NAME>_mixamo.fbx game-assets/animations/default/idle.fbx \
+  outputs/<NAME>/<NAME>_tpose.blend
+```
+
+**왜** — 리타게팅 보정식 `(src_pose @ src_rest⁻¹) @ tgt_rest` 는 타겟 rest 자세를
+**보존**한다. Mixamo 는 T-포즈 rest 를 전제하므로 rest 가 A-포즈면 *"T-포즈에서 팔을
+내리는"* 회전차가 **이미 내려간 팔에 또** 더해진다. 근거·실측은
+[SKILL.md ②-T](../SKILL.md) 가 정본이다.
+
+🛑 **⑥ 검증(22/22 역할·교집합 52)을 통과해도 걸러지지 않는다.** 본 *이름*이 맞는지만
+보고 rest *자세*는 보지 않기 때문이다. **`--check-only` 를 별도로 돌린다.**
+
+🛑 **다리는 기본 제외**(`--parts arms+spine`) — T-포즈는 무릎을 펴는데, 각진 기계 부품은
+그 과정에서 정강이·발 메시가 늘어나 **찢어진다**(실측). 다리 각도차 13~17° 는 감내된다.
 
 ---
 

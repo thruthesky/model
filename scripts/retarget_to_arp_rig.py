@@ -107,8 +107,13 @@ def retarget(tgt, src_arm, src_act, out_name):
         scn.frame_set(f)
         src_pose[f] = {n: rotm(src_arm.matrix_world @ src_arm.pose.bones[n].matrix) for n in common}
         if hips in common:
-            src_hips[f] = (src_arm.pose.bones[hips].matrix.translation
-                           - src_arm.data.bones[hips].head_local)
+            # 🛑 월드 공간에서 잰다. pose_bone.matrix 는 **아마추어 로컬**이고 Mixamo 리그의
+            #    로컬은 Y-up 이라, 그대로 쓰면 걷기의 *전방*(로컬 Z) 이동이 타겟의 *상방*
+            #    (Z-up)으로 들어가 캐릭터가 공중에 뜬다.
+            #    실측(2026-09-04 scrap): walk 에서 발이 +0.814 m — 월드 기준으로 고쳐 +0.025 m.
+            src_hips[f] = ((src_arm.matrix_world @ src_arm.pose.bones[hips].matrix).translation
+                           - (src_arm.matrix_world
+                              @ src_arm.data.bones[hips].matrix_local).translation)
 
     order = bone_order(tgt)
     rel = rel_rest(tgt, order)
@@ -130,9 +135,12 @@ def retarget(tgt, src_arm, src_act, out_name):
     hips_scale = None
     if hips in common:
         def leg_len(a):
+            # 🛑 월드 기준으로 잰다 — Mixamo 리그는 cm 단위 데이터에 오브젝트 scale 0.01 이
+            #    걸려 있어, 로컬 길이로 재면 두 리그의 비가 100 배 어긋난다.
             try:
-                return (a.data.bones["mixamorig:LeftUpLeg"].head_local
-                        - a.data.bones["mixamorig:LeftFoot"].head_local).length
+                return ((a.matrix_world @ a.data.bones["mixamorig:LeftUpLeg"].head_local)
+                        - (a.matrix_world
+                           @ a.data.bones["mixamorig:LeftFoot"].head_local)).length
             except KeyError:
                 return None
         lt, ls = leg_len(tgt), leg_len(src_arm)
