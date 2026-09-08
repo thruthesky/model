@@ -345,7 +345,12 @@ def main() -> int:
     if len(prims) > 1:
         biggest = max(prims, key=lambda p: p["tris"])
         share = biggest["tris"] / max(tris, 1) * 100
-        if share > 70:
+        if args.kind == "prop":
+            # A basin plus tiny instanced water drops legitimately spends most
+            # triangles on the basin. The weapon-vs-character heuristic does
+            # not describe props; retain the independent total triangle gate.
+            ok(f"기물 부품 분포 기록 (최대 프리미티브 {share:.0f}%, 전체 예산은 별도 검사)")
+        elif share > 70:
             fail(f"프리미티브 하나가 삼각형의 {share:.0f}% 를 차지한다 "
                  f"(mat {biggest['material']}: {biggest['tris']:,} / {tris:,}) "
                  f"— 나머지가 뭉개졌을 가능성이 높다. "
