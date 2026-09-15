@@ -568,15 +568,6 @@ def main() -> int:
         pushed = push_actions_to_nla(arm, anim_names)
         log(f"NLA 트랙 {pushed}개로 분리 — glTF 가 애니메이션을 따로 내보내게 한다")
 
-    # ── Godot 정면(-Z) 맞추기 — 🛑 리깅·애니가 끝난 지금 한다 ─────────────
-    if arm and args.kind in ("human", "animal") and not args.no_face_godot:
-        was = face_godot_forward(arm, meshes)
-        if was == "-Y":
-            log("정면 교정 — Blender -Y → +Y 로 180° 회전 "
-                "(glTF 에서 -Z = Godot 정면)")
-        else:
-            log("정면 이미 +Y — 교정 불필요")
-
     # ── 캐릭터가 아닌 메시 제거 ───────────────────────────────────────────
     # 🛑 ARP 리깅·리타게팅은 컨트롤러 위젯(`cs_*`)이나 임시 프리미티브를 씬에
     # 남긴다. 그것들이 GLB 에 함께 실리면 **bbox 를 부풀려** 캐릭터가 실제보다
@@ -599,6 +590,16 @@ def main() -> int:
             log(f"캐릭터가 아닌 메시 {len(dropped)}개 제거: {', '.join(dropped[:5])}"
                 f"{' …' if len(dropped) > 5 else ''}")
         meshes = [o for o in bpy.data.objects if o.type == "MESH"]
+
+    # Strays go first: detect_forward samples the lowest 12% of every mesh, so a stray below the feet flips the result.
+    # ── Godot 정면(-Z) 맞추기 — 🛑 리깅·애니가 끝난 지금 한다 ─────────────
+    if arm and args.kind in ("human", "animal") and not args.no_face_godot:
+        was = face_godot_forward(arm, meshes)
+        if was == "-Y":
+            log("정면 교정 — Blender -Y → +Y 로 180° 회전 "
+                "(glTF 에서 -Z = Godot 정면)")
+        else:
+            log("정면 이미 +Y — 교정 불필요")
 
     # ── 텍스처 ────────────────────────────────────────────────────────────
     changed = resize_textures(args.texture)
