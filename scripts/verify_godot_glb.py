@@ -222,6 +222,19 @@ def anim_frame_span(g: dict, anim: dict) -> float:
     return span
 
 
+def artifacts_dir_for(glb: Path) -> Path:
+    """산출물 폴더 — glb 가 속한 Godot 프로젝트의 `.artifacts/model-verify/`.
+
+    🛑 glb 옆(`res://` 안)에 쓰지 않는다 — Godot 내보내기는 프로젝트 폴더의 모든 파일을 담으므로
+    검증 JSON 이 앱 번들에 그대로 딸려 들어갔다(2026-09-17 실측: raseron.glb.verify.json). `.artifacts/` 는
+    .gitignore·exclude_filter 양쪽에서 빠진 폴더다. project.godot 을 못 찾으면 현재 폴더 아래에 만든다.
+    """
+    for parent in [glb.resolve().parent, *glb.resolve().parents]:
+        if (parent / "project.godot").exists():
+            return parent / ".artifacts" / "model-verify"
+    return Path.cwd() / ".artifacts" / "model-verify"
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description="Godot 용 GLB 규격 검증")
     ap.add_argument("glb", type=Path)
@@ -232,7 +245,11 @@ def main() -> int:
                     help="형태. prop 은 리그·애니 검사를 건너뛴다")
     ap.add_argument("--tris", type=int, default=BUDGET["tris_max"])
     ap.add_argument("--tex", type=int, default=BUDGET["tex_max"])
-    ap.add_argument("--json", action="store_true", help="결과를 JSON 으로도 출력")
+    ap.add_argument("--json", action="store_true",
+                    help="결과를 JSON 으로도 저장 — 🛑 glb 옆이 아니라 <프로젝트>/.artifacts/model-verify/ 에 쓴다"
+                         "(앱 번들에 딸려 들어가지 않게 · 2026-09-17)")
+    ap.add_argument("--json-out", type=Path, default=None,
+                    help="JSON 저장 경로를 직접 지정(기본: .artifacts/model-verify/<이름>.verify.json)")
     args = ap.parse_args()
 
     if not args.glb.exists():
@@ -457,7 +474,8 @@ def main() -> int:
     report["warns"] = warns
 
     if args.json:
-        out = args.glb.with_suffix(args.glb.suffix + ".verify.json")
+        out = args.json_out or artifacts_dir_for(args.glb) / (args.glb.name + ".verify.json")
+        out.parent.mkdir(parents=True, exist_ok=True)
         out.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding="utf-8")
         print(f"JSON: {out}")
 
